@@ -29,7 +29,7 @@ def get_monitor_path(mode: str, seed: int, run_tag: str = "") -> str:
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", choices=["pure", "pirl"], default="pure")
-parser.add_argument("--steps", type=int, default=300_000)
+parser.add_argument("--steps", type=int, default=2_000_000)
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument(
     "--run-tag",
@@ -49,6 +49,13 @@ parser.add_argument(
     type=float,
     default=0.0005,
     help="Peso da penalidade de torque na recompensa (modo pirl).",
+)
+parser.add_argument(
+    "--learning-rate",
+    type=float,
+    default=3e-4,
+    dest="learning_rate",
+    help="Taxa de aprendizado do otimizador PPO.",
 )
 args = parser.parse_args()
 
@@ -87,7 +94,7 @@ model = PPO(
     env,
     verbose=1,
     seed=args.seed,
-    learning_rate=3e-4,
+    learning_rate=args.learning_rate,
     n_steps=2048,
     batch_size=256,
     n_epochs=10,
