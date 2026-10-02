@@ -13,6 +13,8 @@ class TwoLinkArmEnv(gym.Env):
         reward_mode: str = "pure",
         lambda_a: float = 0.001,
         alpha_tau: float = 0.0005,
+        step_sleep: float = 0.0,
+        max_delta_theta: float = 0.1,
     ):
         super(TwoLinkArmEnv, self).__init__()
         self.reward_mode = reward_mode
@@ -20,6 +22,12 @@ class TwoLinkArmEnv(gym.Env):
         # pesos da função de recompensa
         self.lambda_a = float(lambda_a)
         self.alpha_tau = float(alpha_tau)
+
+        # pausa opcional após cada passo quando render=True (para visualização)
+        self.step_sleep = float(step_sleep)
+
+        # variação máxima de ângulo por passo (módulo da ação)
+        self.max_delta_theta = float(max_delta_theta)
 
         self.render_mode = render
         self.physicsClient = p.connect(p.GUI if render else p.DIRECT)
@@ -50,10 +58,10 @@ class TwoLinkArmEnv(gym.Env):
             dtype=np.float32,
         )
 
-        # Ações: variação nos ângulos das juntas
+        # Ações: variação nos ângulos das juntas (incrementos)
         self.action_space = spaces.Box(
-            low=np.array([-0.1, -0.1]),
-            high=np.array([0.1, 0.1]),
+            low=np.array([-self.max_delta_theta, -self.max_delta_theta]),
+            high=np.array([self.max_delta_theta, self.max_delta_theta]),
             dtype=np.float32,
         )
 
@@ -66,6 +74,9 @@ class TwoLinkArmEnv(gym.Env):
         self.ep_energy = 0.0
         self.ep_steps = 0
 
+        # índice do episódio (incrementado a cada reset)
+        self.episode_idx = 0
+
         self.reset()
 
     def reset(self):
@@ -74,7 +85,10 @@ class TwoLinkArmEnv(gym.Env):
 
         self.target_pos = self._sample_target()
 
-         # zera acumuladores por episódio
+        # novo episódio
+        self.episode_idx += 1
+
+        # zera acumuladores por episódio
         self.ep_tau_sum_total = 0.0
         self.ep_energy = 0.0
         self.ep_steps = 0
@@ -100,6 +114,8 @@ class TwoLinkArmEnv(gym.Env):
         # aplica ângulos alvo e avança simulação física
         self._apply_angles(th1_target, th2_target)
         p.stepSimulation()
+        if self.render_mode and self.step_sleep > 0.0:
+            time.sleep(self.step_sleep)
 
         # lê estado REAL das juntas após o passo
         js = p.getJointStates(self.robot, [0, 1])
@@ -131,6 +147,9 @@ class TwoLinkArmEnv(gym.Env):
         if not np.isnan(power):
             self.ep_energy += power * self.dt
         self.ep_steps += 1
+
+        if self.render_mode:
+            print(f"[TwoLinkArmEnv] episodio={self.episode_idx} step={self.ep_steps}")
 
         # ====== REWARD ======
         # RL puro: -distância + penalidade leve de ação

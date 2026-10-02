@@ -29,7 +29,7 @@ def get_monitor_path(mode: str, seed: int, run_tag: str = "") -> str:
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", choices=["pure", "pirl"], default="pure")
-parser.add_argument("--steps", type=int, default=2_000_000)
+parser.add_argument("--steps", type=int, default=300_000)
 parser.add_argument("--seed", type=int, default=0)
 parser.add_argument(
     "--run-tag",
@@ -40,14 +40,14 @@ parser.add_argument(
 parser.add_argument(
     "--lambda-a",
     type=float,
-    default=0.001,
+    default=0.03,
     dest="lambda_a",
     help="Peso da penalidade de acao na recompensa.",
 )
 parser.add_argument(
     "--alpha-tau",
     type=float,
-    default=0.0005,
+    default=0.01,
     help="Peso da penalidade de torque na recompensa (modo pirl).",
 )
 parser.add_argument(
@@ -56,6 +56,30 @@ parser.add_argument(
     default=3e-4,
     dest="learning_rate",
     help="Taxa de aprendizado do otimizador PPO.",
+)
+parser.add_argument(
+    "--render",
+    action="store_true",
+    help="Se definido, abre a GUI do PyBullet durante o treino.",
+)
+parser.add_argument(
+    "--step-sleep",
+    type=float,
+    default=0.0,
+    help=(
+        "Pausa em segundos apos cada passo de simulacao quando --render esta ativo "
+        "(para desacelerar a animacao)."
+    ),
+)
+parser.add_argument(
+    "--max-delta-theta",
+    type=float,
+    default=0.1,
+    dest="max_delta_theta",
+    help=(
+        "Modulo maximo da variacao de angulo por passo (acao) em radianos. "
+        "Default=0.1 (~5.7 graus)."
+    ),
 )
 args = parser.parse_args()
 
@@ -68,10 +92,12 @@ monitor_path = get_monitor_path(args.mode, args.seed, args.run_tag)
 model_path = get_model_path(args.mode, args.seed, args.run_tag)
 
 env = TwoLinkArmEnv(
-    render=False,
+    render=args.render,
     reward_mode=args.mode,
     lambda_a=args.lambda_a,
     alpha_tau=args.alpha_tau,
+    step_sleep=args.step_sleep,
+    max_delta_theta=args.max_delta_theta,
 )
 env = TimeLimit(env, max_episode_steps=200)
 
