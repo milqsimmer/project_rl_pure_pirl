@@ -1,0 +1,14 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pirl --seed 0 --steps 3000000 --learning-rate 3e-4 --lambda-a 0.03 --alpha-tau 0.005
+args_json: {
+  "mode": "pirl",
+  "steps": 3000000,
+  "seed": 0,
+  "run_tag": "",
+  "lambda_a": 0.03,
+  "alpha_tau": 0.005,
+  "learning_rate": 0.0003,
+  "render": false,
+  "step_sleep": 0.0,
+  "target_seed": null,
+  "max_delta_theta": 0.1
+}
