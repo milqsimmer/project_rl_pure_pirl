@@ -47,7 +47,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha-tau",
     type=float,
-    default=0.01,
+    default=0.001,
     help="Peso da penalidade de torque na recompensa (modo pirl).",
 )
 parser.add_argument(

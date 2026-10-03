@@ -1,6 +1,8 @@
 import argparse
+import json
 import os
 import random
+import sys
 import numpy as np
 import gym
 from gym.wrappers import TimeLimit
@@ -27,6 +29,23 @@ def get_monitor_path(mode: str, seed: int, run_tag: str = "") -> str:
     return os.path.join(get_run_dir(mode, seed, run_tag), "monitor.csv")
 
 
+def save_train_command_log(args: argparse.Namespace, run_dir: str) -> None:
+    """Salva, na pasta de treino, o comando e os parametros usados."""
+
+    log_path = os.path.join(run_dir, "train_cmd.txt")
+    try:
+        cmdline = " ".join([sys.executable] + sys.argv[1:])
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("command: " + cmdline + "\n")
+            f.write(
+                "args_json: "
+                + json.dumps(vars(args), ensure_ascii=False, indent=2)
+                + "\n"
+            )
+    except Exception as e:
+        print(f"[train_rl] Aviso: nao foi possivel salvar log de comando: {e}")
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument("--mode", choices=["pure", "pirl"], default="pure")
 parser.add_argument("--steps", type=int, default=300_000)
@@ -47,7 +66,7 @@ parser.add_argument(
 parser.add_argument(
     "--alpha-tau",
     type=float,
-    default=0.01,
+    default=0.001,
     help="Peso da penalidade de torque na recompensa (modo pirl).",
 )
 parser.add_argument(
@@ -99,6 +118,8 @@ os.makedirs(run_dir, exist_ok=True)
 
 monitor_path = get_monitor_path(args.mode, args.seed, args.run_tag)
 model_path = get_model_path(args.mode, args.seed, args.run_tag)
+
+save_train_command_log(args, run_dir)
 
 env = TwoLinkArmEnv(
     render=args.render,

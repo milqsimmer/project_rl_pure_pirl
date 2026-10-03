@@ -1,4 +1,4 @@
-import os, json, csv, time, argparse
+import os, json, csv, time, argparse, sys
 import numpy as np
 import gym
 import argparse
@@ -161,6 +161,28 @@ def evaluate(
     return summary, ep_rows
 
 
+def save_eval_command_log(args: argparse.Namespace) -> None:
+    """Salva, na pasta de resultados, o comando e os parametros usados."""
+
+    base = f"{args.out}_{args.seed}"
+    dir_name = os.path.dirname(base)
+    if dir_name:
+        os.makedirs(dir_name, exist_ok=True)
+    log_path = base + "_cmd.txt"
+
+    try:
+        cmdline = " ".join([sys.executable] + sys.argv[1:])
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("command: " + cmdline + "\n")
+            f.write(
+                "args_json: "
+                + json.dumps(vars(args), ensure_ascii=False, indent=2)
+                + "\n"
+            )
+    except Exception as e:
+        print(f"[eval_rl] Aviso: nao foi possivel salvar log de comando: {e}")
+
+
 def save_csv(csv_path: str, rows: list, summaries: list):
     dir_name = os.path.dirname(csv_path)
     if dir_name:  # só cria diretório se tiver pasta no caminho
@@ -270,6 +292,8 @@ if __name__ == "__main__":
     )
 
     args = ap.parse_args()
+
+    save_eval_command_log(args)
 
     modes = ["pure", "pirl"] if args.mode == "both" else [args.mode]
 
