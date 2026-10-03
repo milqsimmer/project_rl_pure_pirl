@@ -15,6 +15,7 @@ class TwoLinkArmEnv(gym.Env):
         alpha_tau: float = 0.0005,
         step_sleep: float = 0.0,
         max_delta_theta: float = 0.1,
+        target_seed: int | None = None,
     ):
         super(TwoLinkArmEnv, self).__init__()
         self.reward_mode = reward_mode
@@ -28,6 +29,12 @@ class TwoLinkArmEnv(gym.Env):
 
         # variação máxima de ângulo por passo (módulo da ação)
         self.max_delta_theta = float(max_delta_theta)
+
+        # gerador de números aleatórios para os alvos (independente do np.random global)
+        if target_seed is None:
+            self.target_rng = np.random
+        else:
+            self.target_rng = np.random.RandomState(int(target_seed))
 
         self.render_mode = render
         self.physicsClient = p.connect(p.GUI if render else p.DIRECT)
@@ -200,8 +207,8 @@ class TwoLinkArmEnv(gym.Env):
 
     def _sample_target(self):
         while True:
-            x = np.random.uniform(0.1, 0.9)
-            y = np.random.uniform(-0.5, 0.5)
+            x = self.target_rng.uniform(0.1, 0.9)
+            y = self.target_rng.uniform(-0.5, 0.5)
             if np.hypot(x, y) <= (self.l1 + self.l2):
                 return [x, y]
 

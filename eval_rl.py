@@ -24,6 +24,7 @@ def evaluate(
     print_episodes: bool = False,
     seed: int = 0,
     run_tag: str = "",
+    target_seed: int | None = None,
 ):
     """Avalia um modelo salvo para um determinado modo ('pure' ou 'pirl')."""
     model_path = get_model_path(mode, seed, run_tag)
@@ -32,7 +33,11 @@ def evaluate(
         raise FileNotFoundError(f"Modelo não encontrado: {model_path}")
 
     # env legado (gym 0.21): reset()->obs ; step()->(obs, reward, done, info)
-    env = TwoLinkArmEnv(render=render, reward_mode=mode)
+    env = TwoLinkArmEnv(
+        render=render,
+        reward_mode=mode,
+        target_seed=target_seed,
+    )
     env = TimeLimit(env, max_episode_steps=max_steps)
     model = PPO.load(model_path, env=env)
 
@@ -254,6 +259,15 @@ if __name__ == "__main__":
         default="",
         help="Sufixo opcional usado no diretório de treino (seed_X_<tag>).",
     )
+    ap.add_argument(
+        "--target-seed",
+        type=int,
+        default=None,
+        help=(
+            "Seed usada apenas para amostrar os alvos do ambiente na avaliacao. "
+            "Use o mesmo valor no treino para alinhar a sequencia de alvos."
+        ),
+    )
 
     args = ap.parse_args()
 
@@ -270,6 +284,7 @@ if __name__ == "__main__":
             print_episodes=args.print_episodes,
             seed=args.seed,
             run_tag=args.run_tag,
+            target_seed=args.target_seed,
         )
         summaries.append(summary)
         all_rows.extend(rows)

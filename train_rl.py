@@ -72,6 +72,15 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
+    "--target-seed",
+    type=int,
+    default=None,
+    help=(
+        "Seed usada apenas para amostrar os alvos do ambiente. "
+        "Permite alinhar a sequencia de alvos entre pure/pirl."
+    ),
+)
+parser.add_argument(
     "--max-delta-theta",
     type=float,
     default=0.1,
@@ -98,6 +107,7 @@ env = TwoLinkArmEnv(
     alpha_tau=args.alpha_tau,
     step_sleep=args.step_sleep,
     max_delta_theta=args.max_delta_theta,
+    target_seed=args.target_seed,
 )
 env = TimeLimit(env, max_episode_steps=200)
 
