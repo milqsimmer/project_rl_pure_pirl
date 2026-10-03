@@ -11,8 +11,8 @@ class TwoLinkArmEnv(gym.Env):
         self,
         render: bool = False,
         reward_mode: str = "pure",
-        lambda_a: float = 0.001,
-        alpha_tau: float = 0.0005,
+        lambda_a: float = 0.03,
+        alpha_tau: float = 0.001,
         step_sleep: float = 0.0,
         max_delta_theta: float = 0.1,
     ):

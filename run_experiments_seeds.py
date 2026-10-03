@@ -38,14 +38,14 @@ def main() -> None:
     parser.add_argument(
         "--lambda-a",
         type=float,
-        default=0.001,
+        default=0.03,
         dest="lambda_a",
         help="Peso lambda_a da penalidade de acao.",
     )
     parser.add_argument(
         "--alpha-tau",
         type=float,
-        default=0.0005,
+        default=0.001,
         help="Peso alpha_tau da penalidade de torque no modo pirl.",
     )
     parser.add_argument(
