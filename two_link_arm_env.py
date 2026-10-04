@@ -16,6 +16,7 @@ class TwoLinkArmEnv(gym.Env):
         step_sleep: float = 0.0,
         max_delta_theta: float = 0.1,
         target_seed: int | None = None,
+        success_bonus: float = 0.0,
     ):
         super(TwoLinkArmEnv, self).__init__()
         self.reward_mode = reward_mode
@@ -23,6 +24,9 @@ class TwoLinkArmEnv(gym.Env):
         # pesos da função de recompensa
         self.lambda_a = float(lambda_a)
         self.alpha_tau = float(alpha_tau)
+
+        # bônus opcional aplicado quando alcança o alvo (dist < success_threshold)
+        self.success_bonus = float(success_bonus)
 
         # pausa opcional após cada passo quando render=True (para visualização)
         self.step_sleep = float(step_sleep)
@@ -169,6 +173,10 @@ class TwoLinkArmEnv(gym.Env):
             reward = -dist - lam_a * float(np.linalg.norm(action)) - alpha_tau * tau_sum
 
         done = dist < self.success_threshold
+
+        # bônus de sucesso: aplica apenas no passo em que alcança o alvo
+        if done and self.success_bonus != 0.0:
+            reward += self.success_bonus
 
         mean_tau = (
             self.ep_tau_sum_total / self.ep_steps if self.ep_steps > 0 else float("nan")

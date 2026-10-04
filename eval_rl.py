@@ -25,6 +25,7 @@ def evaluate(
     seed: int = 0,
     run_tag: str = "",
     target_seed: int | None = None,
+    success_bonus: float = 0.0,
 ):
     """Avalia um modelo salvo para um determinado modo ('pure' ou 'pirl')."""
     model_path = get_model_path(mode, seed, run_tag)
@@ -37,6 +38,7 @@ def evaluate(
         render=render,
         reward_mode=mode,
         target_seed=target_seed,
+        success_bonus=success_bonus,
     )
     env = TimeLimit(env, max_episode_steps=max_steps)
     model = PPO.load(model_path, env=env)
@@ -290,6 +292,15 @@ if __name__ == "__main__":
             "Use o mesmo valor no treino para alinhar a sequencia de alvos."
         ),
     )
+    ap.add_argument(
+        "--success-bonus",
+        type=float,
+        default=0.0,
+        help=(
+            "Bonus adicional somado ao reward no passo em que o alvo e alcancado "
+            "(dist < success_threshold) durante a avaliacao."
+        ),
+    )
 
     args = ap.parse_args()
 
@@ -309,6 +320,7 @@ if __name__ == "__main__":
             seed=args.seed,
             run_tag=args.run_tag,
             target_seed=args.target_seed,
+            success_bonus=args.success_bonus,
         )
         summaries.append(summary)
         all_rows.extend(rows)

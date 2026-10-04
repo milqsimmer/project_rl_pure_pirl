@@ -109,6 +109,16 @@ parser.add_argument(
         "Default=0.1 (~5.7 graus)."
     ),
 )
+parser.add_argument(
+    "--success-bonus",
+    type=float,
+    default=0.0,
+    dest="success_bonus",
+    help=(
+        "Bonus adicional somado ao reward no passo em que o alvo e alcancado "
+        "(dist < success_threshold). Default=0.0 (sem bonus)."
+    ),
+)
 args = parser.parse_args()
 
 set_global_seed(args.seed)
@@ -129,6 +139,7 @@ env = TwoLinkArmEnv(
     step_sleep=args.step_sleep,
     max_delta_theta=args.max_delta_theta,
     target_seed=args.target_seed,
+    success_bonus=args.success_bonus,
 )
 env = TimeLimit(env, max_episode_steps=200)
 
