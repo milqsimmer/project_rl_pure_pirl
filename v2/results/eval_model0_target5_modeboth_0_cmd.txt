@@ -1,0 +1,13 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode both --seed 0 --episodes 200 --max-steps 200 --target-seed 5 --out results/eval_model0_target5_modeboth
+args_json: {
+  "mode": "both",
+  "seed": 0,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/eval_model0_target5_modeboth",
+  "print_episodes": false,
+  "run_tag": "",
+  "target_seed": 5,
+  "success_bonus": 0.0
+}
