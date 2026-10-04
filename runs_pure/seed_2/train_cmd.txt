@@ -1,0 +1,15 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pure --seed 2 --steps 2000000 --lambda-a 0.03 --target-seed 2
+args_json: {
+  "mode": "pure",
+  "steps": 2000000,
+  "seed": 2,
+  "run_tag": "",
+  "lambda_a": 0.03,
+  "alpha_tau": 0.001,
+  "learning_rate": 0.0003,
+  "render": false,
+  "step_sleep": 0.0,
+  "target_seed": 2,
+  "max_delta_theta": 0.1,
+  "success_bonus": 0.0
+}
