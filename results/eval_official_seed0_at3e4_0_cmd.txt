@@ -1,0 +1,13 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pirl --seed 0 --episodes 200 --max-steps 200 --run-tag at3e4 --out results/eval_official_seed0_at3e4
+args_json: {
+  "mode": "pirl",
+  "seed": 0,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/eval_official_seed0_at3e4",
+  "print_episodes": false,
+  "run_tag": "at3e4",
+  "target_seed": null,
+  "success_bonus": 0.0
+}
