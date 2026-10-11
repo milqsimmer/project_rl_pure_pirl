@@ -1,0 +1,13 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pure --seed 0 --episodes 200 --max-steps 200 --run-tag la5e3 --out results/eval_pure_seed0_la5e3
+args_json: {
+  "mode": "pure",
+  "seed": 0,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/eval_pure_seed0_la5e3",
+  "print_episodes": false,
+  "run_tag": "la5e3",
+  "target_seed": null,
+  "success_bonus": 0.0
+}

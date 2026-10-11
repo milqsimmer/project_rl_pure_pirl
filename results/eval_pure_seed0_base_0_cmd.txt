@@ -1,0 +1,13 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pure --seed 0 --episodes 200 --max-steps 200 --run-tag base --out results/eval_pure_seed0_base
+args_json: {
+  "mode": "pure",
+  "seed": 0,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/eval_pure_seed0_base",
+  "print_episodes": false,
+  "run_tag": "base",
+  "target_seed": null,
+  "success_bonus": 0.0
+}

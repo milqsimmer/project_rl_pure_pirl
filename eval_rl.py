@@ -26,6 +26,7 @@ def evaluate(
     run_tag: str = "",
     target_seed: int | None = None,
     success_bonus: float = 0.0,
+    max_delta_theta: float = 0.1,
 ):
     """Avalia um modelo salvo para um determinado modo ('pure' ou 'pirl')."""
     model_path = get_model_path(mode, seed, run_tag)
@@ -39,6 +40,7 @@ def evaluate(
         reward_mode=mode,
         target_seed=target_seed,
         success_bonus=success_bonus,
+        max_delta_theta=max_delta_theta,
     )
     env = TimeLimit(env, max_episode_steps=max_steps)
     model = PPO.load(model_path, env=env)
@@ -301,6 +303,16 @@ if __name__ == "__main__":
             "(dist < success_threshold) durante a avaliacao."
         ),
     )
+    ap.add_argument(
+        "--max-delta-theta",
+        type=float,
+        default=0.1,
+        help=(
+            "Modulo maximo da variacao de angulo por passo (acao) em radianos "
+            "durante a avaliacao. Deve coincidir com o valor usado no treino "
+            "para evitar erro de incompatibilidade de action_space."
+        ),
+    )
 
     args = ap.parse_args()
 
@@ -321,6 +333,7 @@ if __name__ == "__main__":
             run_tag=args.run_tag,
             target_seed=args.target_seed,
             success_bonus=args.success_bonus,
+            max_delta_theta=args.max_delta_theta,
         )
         summaries.append(summary)
         all_rows.extend(rows)

@@ -1,0 +1,13 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pure --seed 0 --episodes 200 --max-steps 200 --run-tag sb8 --out results/eval_pure_seed0_sb8
+args_json: {
+  "mode": "pure",
+  "seed": 0,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/eval_pure_seed0_sb8",
+  "print_episodes": false,
+  "run_tag": "sb8",
+  "target_seed": null,
+  "success_bonus": 0.0
+}
