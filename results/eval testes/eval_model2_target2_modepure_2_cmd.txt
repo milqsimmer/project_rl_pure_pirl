@@ -1,0 +1,14 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pure --seed 2 --episodes 200 --max-steps 200 --target-seed 2 --max-delta-theta 0.2 --success-bonus 5.0 --out results/eval_model2_target2_modepure --run-tag md02
+args_json: {
+  "mode": "pure",
+  "seed": 2,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/eval_model2_target2_modepure",
+  "print_episodes": false,
+  "run_tag": "md02",
+  "target_seed": 2,
+  "success_bonus": 5.0,
+  "max_delta_theta": 0.2
+}
