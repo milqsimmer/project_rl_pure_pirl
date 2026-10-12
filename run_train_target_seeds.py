@@ -72,6 +72,16 @@ def main() -> None:
         ),
     )
     parser.add_argument(
+        "--max-delta-theta",
+        type=float,
+        default=0.2,
+        dest="max_delta_theta",
+        help=(
+            "Modulo maximo da variacao de angulo por passo (acao) em radianos. "
+            "Default=0.2 (config atual usada para pure forte)."
+        ),
+    )
+    parser.add_argument(
         "--skip-pure",
         action="store_true",
         help="Pula os treinos do modo pure.",
@@ -107,6 +117,8 @@ def main() -> None:
                 str(args.steps),
                 "--lambda-a",
                 str(args.lambda_a),
+                "--max-delta-theta",
+                str(args.max_delta_theta),
                 "--target-seed",
                 str(seed),
                 "--success-bonus",
@@ -131,6 +143,8 @@ def main() -> None:
                 str(args.lambda_a),
                 "--alpha-tau",
                 str(args.alpha_tau),
+                "--max-delta-theta",
+                str(args.max_delta_theta),
                 "--target-seed",
                 str(seed),
                 "--success-bonus",

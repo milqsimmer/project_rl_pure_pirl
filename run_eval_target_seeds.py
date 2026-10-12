@@ -79,6 +79,26 @@ def main() -> None:
         default="",
         help="Sufixo opcional usado no diretorio de treino (seed_X_<tag>).",
     )
+    parser.add_argument(
+        "--max-delta-theta",
+        type=float,
+        default=0.2,
+        dest="max_delta_theta",
+        help=(
+            "Modulo maximo da variacao de angulo por passo (acao) em radianos "
+            "durante a avaliacao. Deve coincidir com o valor usado no treino; "
+            "default=0.2 (config atual do pure forte).",
+        ),
+    )
+    parser.add_argument(
+        "--success-bonus",
+        type=float,
+        default=5.0,
+        help=(
+            "Bonus adicional somado ao reward no passo de sucesso durante o eval "
+            "(mantido igual ao treino na configuracao atual).",
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -136,6 +156,10 @@ def main() -> None:
             str(args.max_steps),
             "--target-seed",
             str(target_seed),
+            "--max-delta-theta",
+            str(args.max_delta_theta),
+            "--success-bonus",
+            str(args.success_bonus),
             "--out",
             out_prefix,
         ]
