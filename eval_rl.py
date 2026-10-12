@@ -320,6 +320,9 @@ if __name__ == "__main__":
 
     modes = ["pure", "pirl"] if args.mode == "both" else [args.mode]
 
+    # se target_seed nao for informado, usa a propria seed como padrao
+    target_seed_effective = args.target_seed if args.target_seed is not None else args.seed
+
     all_rows = []
     summaries = []
     for m in modes:
@@ -331,7 +334,7 @@ if __name__ == "__main__":
             print_episodes=args.print_episodes,
             seed=args.seed,
             run_tag=args.run_tag,
-            target_seed=args.target_seed,
+            target_seed=target_seed_effective,
             success_bonus=args.success_bonus,
             max_delta_theta=args.max_delta_theta,
         )

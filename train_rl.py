@@ -123,6 +123,8 @@ args = parser.parse_args()
 
 set_global_seed(args.seed)
 
+target_seed_effective = args.target_seed if args.target_seed is not None else args.seed
+
 run_dir = get_run_dir(args.mode, args.seed, args.run_tag)
 os.makedirs(run_dir, exist_ok=True)
 
@@ -138,7 +140,7 @@ env = TwoLinkArmEnv(
     alpha_tau=args.alpha_tau,
     step_sleep=args.step_sleep,
     max_delta_theta=args.max_delta_theta,
-    target_seed=args.target_seed,
+    target_seed=target_seed_effective,
     success_bonus=args.success_bonus,
 )
 env = TimeLimit(env, max_episode_steps=200)
