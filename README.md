@@ -138,6 +138,13 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
    python train_rl.py --mode pirl --seed 4 --steps 2000000 --learning-rate 3e-4
    ```
 
+> Configuração baseline recomendada (pure), usada nos experimentos atuais:
+> - `steps = 2_000_000`, `learning-rate = 3e-4`
+> - `lambda_a = 0.01`
+> - `success_bonus = 5.0`
+> - `max-delta-theta = 0.2` (maior intervalo de ação ajuda a convergir)
+> - `max-steps` no treino/avaliação = 200
+
 4. Saídas dos treinos:
     - `runs_pure/seed_<seed>/monitor.csv` e `runs_pure/seed_<seed>/ppo_model_<seed>.zip`.
     - `runs_pirl/seed_<seed>/monitor.csv` e `runs_pirl/seed_<seed>/ppo_model_<seed>.zip`.
