@@ -52,7 +52,11 @@ def rollout_episodes(
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Modelo nao encontrado: {model_path}")
 
-    env = TwoLinkArmEnv(render=False, reward_mode=mode)
+    env = TwoLinkArmEnv(
+        render=False,
+        reward_mode=mode,
+        max_delta_theta=0.2,
+    )
     env = TimeLimit(env, max_episode_steps=max_steps)
     model = PPO.load(model_path, env=env)
 

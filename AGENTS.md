@@ -248,7 +248,8 @@ interfaces. New agents should prefer the newer helpers when possible.
   - Reward modes remain `pure` and `pirl`.
   - New parameters on `TwoLinkArmEnv.__init__` (all with defaults):
     - `lambda_a`: weight on action penalty (norm of `Δtheta`).
-    - `alpha_tau`: weight on torque penalty (only used in `pirl`).
+    - `alpha_tau`: weight on torque penalty (only used in `pirl`, as a
+      terminal penalty on mean torque per episode).
     - `step_sleep`: optional `time.sleep` after `p.stepSimulation()` when
       `render=True` (used to slow down visual training).
     - `max_delta_theta`: max absolute increment per joint per step;
@@ -267,7 +268,8 @@ interfaces. New agents should prefer the newer helpers when possible.
   - New flags wired into `TwoLinkArmEnv`:
     - `--render`, `--step-sleep`: enable PyBullet GUI and slow it down.
     - `--target-seed`: passes through to env for deterministic target
-      sequences; use the same value for pure/pirl to compare fairly.
+      sequences; if omitted, defaults to the PPO `--seed`, so pure and
+      pirl with the same seed see the same targets.
     - `--max-delta-theta`: controls the action range in radians.
     - `--success-bonus`: enables the success bonus term in reward.
   - For each run, a `train_cmd.txt` is written under the run directory
@@ -383,10 +385,11 @@ then gradually add physics-informed terms for `pirl`.
 
 - Phase 4 – Only then, gradually add physics terms to `pirl`
   - Start from the stable `pure` config and treat it as baseline.
-  - For `pirl`, keep per-step reward close to `pure` and add physics
-    terms carefully, e.g.:
-    - very small `alpha_tau` (torque penalty) to avoid crushing success;
-    - or terminal-only penalties based on episode energy,
+  - For `pirl`, keep per-step reward identical to `pure` and add
+    physics terms only as terminal penalties, e.g.:
+    - very small `alpha_tau` on mean episode torque to avoid crushing
+      success;
+    - additional terminal penalties based on episode energy,
       joint-limit/singularity proximity, or torque saturation rates.
   - Optionally, initialize `pirl` training from a converged `pure`
     policy (load pure model, swap env to `reward_mode="pirl"`, then

@@ -166,17 +166,24 @@ class TwoLinkArmEnv(gym.Env):
         # RL puro: -distância + penalidade leve de ação
         lam_a = self.lambda_a
 
-        if self.reward_mode == "pure":
-            reward = -dist - lam_a * float(np.linalg.norm(action))
-        else:  # "pirl"
-            alpha_tau = self.alpha_tau
-            reward = -dist - lam_a * float(np.linalg.norm(action)) - alpha_tau * tau_sum
+        # per-step: igual para pure e pirl; termos físicos entram apenas no terminal
+        reward = -dist - lam_a * float(np.linalg.norm(action))
 
         done = dist < self.success_threshold
 
         # bônus de sucesso: aplica apenas no passo em que alcança o alvo
         if done and self.success_bonus != 0.0:
             reward += self.success_bonus
+
+        # penalização de torque média apenas no passo terminal no modo pirl
+        if done and self.reward_mode == "pirl" and self.alpha_tau != 0.0:
+            mean_tau = (
+                self.ep_tau_sum_total / self.ep_steps
+                if self.ep_steps > 0
+                else float("nan")
+            )
+            if not np.isnan(mean_tau):
+                reward -= self.alpha_tau * mean_tau
 
         mean_tau = (
             self.ep_tau_sum_total / self.ep_steps if self.ep_steps > 0 else float("nan")

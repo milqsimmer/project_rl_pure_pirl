@@ -144,6 +144,8 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 > - `success_bonus = 5.0`
 > - `max-delta-theta = 0.2` (maior intervalo de ação ajuda a convergir)
 > - `max-steps` no treino/avaliação = 200
+> - `target_seed` por padrão igual a `seed` (pure e pirl com a mesma
+>   seed veem a mesma sequência de alvos)
 
 4. Saídas dos treinos:
     - `runs_pure/seed_<seed>/monitor.csv` e `runs_pure/seed_<seed>/ppo_model_<seed>.zip`.
@@ -261,6 +263,10 @@ python run_plots_results_paper.py --first-seed 0 --last-seed 0 --include-inspect
 
 - Para “apimentar” o modo PIRL:
   - Use os parâmetros existentes (`--alpha-tau` para torque, `--success-bonus` para reforçar sucesso) e,
-    se for adicionar novos termos físicos, siga o plano descrito em `AGENTS.md` (primeiro estabilizar `pure`,
-    depois incluir termos físicos de forma incremental, preferencialmente como termos terminais em energia,
-    saturação ou postura).
+    se for adicionar novos termos físicos, siga o plano descrito em `AGENTS.md`:
+    - manter o reward por passo idêntico ao do `pure`;
+    - aplicar termos físicos (torque médio, energia, postura, saturação)
+      apenas como penalidades terminais por episódio;
+    - ajustar `alpha_tau` de forma incremental, começando em valores
+      pequenos, sempre monitorando a taxa de sucesso versus economia de
+      esforço.
