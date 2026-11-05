@@ -7,6 +7,7 @@ from matplotlib.patches import Circle, Arc, FancyArrowPatch
 
 ENV_FILE = "two_link_arm_env.py"
 URDF_FILE = "two_link_arm.urdf"
+OUT_DIR = "figs/figs_env"
 
 
 def load_env_class(env_file_path):
@@ -400,7 +401,10 @@ def main():
         )
         fig2.tight_layout()
         # fig2.savefig("arm_target_sampled_from_env.png", dpi=300, bbox_inches="tight")
-        fig2.savefig("arm_target_sampled_from_env.svg", bbox_inches="tight")
+        os.makedirs(OUT_DIR, exist_ok=True)
+        fig2.savefig(
+            os.path.join(OUT_DIR, "arm_target_sampled_from_env.svg"), bbox_inches="tight"
+        )
 
         plt.show()
 

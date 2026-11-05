@@ -103,7 +103,7 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
    python train_rl.py --mode pure --seed 0 --steps 2000000 --learning-rate 3e-4
    ```
 
-2. Modo "pirl" (distância + ação + penalidade em torque):
+2. Modo "pirl" (mesmo reward por passo do pure + penalização terminal do torque médio do episódio, peso `--alpha-tau`):
    ```bash
    python train_rl.py --mode pirl --seed 0 --steps 2000000 --learning-rate 3e-4
    ```
@@ -139,10 +139,16 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 > - `max-steps` no treino/avaliação = 200
 > - `target_seed` por padrão igual a `seed` (pure e pirl com a mesma
 >   seed veem a mesma sequência de alvos)
+>
+> Runs oficiais (tags usadas por `plot_train.py`): pure com `--run-tag md02`
+> e pirl com `--alpha-tau 2e-4 --run-tag md02_at2e4`, seeds 0 a 10. As runs
+> `md02_at2e4` foram treinadas com a penalização de torque por passo
+> (versão anterior do reward); as runs `*_term` usam a penalização terminal.
 
 4. Saídas dos treinos:
-    - `runs/runs_pure/seed_<seed>/monitor.csv` e `runs/runs_pure/seed_<seed>/ppo_model_<seed>.zip`.
-    - `runs/runs_pirl/seed_<seed>/monitor.csv` e `runs/runs_pirl/seed_<seed>/ppo_model_<seed>.zip`.
+    - `runs/runs_pure/seed_<seed>[_<run-tag>]/monitor.csv` e `ppo_model_<seed>.zip`.
+    - `runs/runs_pirl/seed_<seed>[_<run-tag>]/monitor.csv` e `ppo_model_<seed>.zip`.
+    - `train_cmd.txt` com o comando e os argumentos de cada run.
 
 
 ### Avaliação
@@ -158,19 +164,21 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 
 2. Comparar diretamente os dois modos:
    ```bash
-   python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 --out results/eval_official_seed0
+   python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 --out results/eval_model0_target0_modeboth
    ```
 
 3. Alinhar alvos de avaliação com o treino (`target_seed`):
    ```bash
    python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 --target-seed 0 \
-       --out results/eval_official_seed0
+       --out results/eval_model0_target0_modeboth
    ```
 
 4. Saídas das avaliações:
-    - `results/eval_official_seed<seed>_<tag>.csv` (métricas por episódio).
-    - `results/eval_official_seed<seed>_<tag>_summary.json` (resumo agregado em JSON).
-    - Scripts de gráficos leem esses arquivos para gerar comparações pure vs pirl.
+    - `<out>_<seed>.csv` (métricas por episódio), `<out>_<seed>_summary.json` (resumo
+      agregado) e `<out>_<seed>_cmd.txt` (comando usado).
+    - Com `scripts/runs/run_eval_target_seeds.py` os arquivos saem como
+      `results/eval_model<seed>_target<seed>_mode<pure|pirl>_<seed>.csv`, padrão lido
+      por `scripts/graficos/plot_eval.py`.
 
 
 ## 🔁 Experimentos com várias seeds
@@ -210,11 +218,16 @@ python scripts/runs/run_eval_target_seeds.py --mode both --model-first-seed 0 --
       --episodes-per-config 20 --max-steps 200
   ```
 
-  - Geração de gráficos e tabelas agregadas (sucesso, distância, esforço, energia)
-  a partir dos CSVs de avaliação oficial:
+- Figuras dos episódios inspecionados (lê `results/episodios_inspecao/`):
   ```bash
-  python scripts/graficos/plot_train.py --seeds 0-4
-  python scripts/graficos/plot_eval.py --first-seed 0 --last-seed 4
+  python scripts/graficos/script_plot_inspected_episodes.py
+  ```
+
+- Geração de gráficos e tabelas agregadas (sucesso, distância, esforço, energia):
+  ```bash
+  python scripts/graficos/plot_train.py --seeds 1-10        # curvas de treino -> figs/figs_treino/
+  python scripts/graficos/plot_eval.py --first-seed 1 --last-seed 10   # tabelas/ e figs/figs_resultados/
+  python scripts/graficos/plot_arm_from_env.py              # figura do braço -> figs/figs_env/
   ```
 
 
@@ -229,7 +242,7 @@ python train_rl.py --mode pirl --seed 0 --steps 2000000 --learning-rate 3e-4
 
 # 2) Avaliação conjunta (gera CSV/JSON em results/)
 python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 \
-    --out results/eval_official_seed0
+    --out results/eval_model0_target0_modeboth
 
 # 3) Análises de escalas e episódios representativos
 python scripts/analyze_scales.py --mode both --policy trained --seed 0 \
@@ -238,7 +251,7 @@ python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 0 \
     --episodes-per-config 20 --max-steps 200
 
 # 4) Geração de gráficos e tabelas agregadas
-python scripts/graficos/plot_train.py --seeds 0
+python scripts/graficos/plot_train.py --seeds 0 --pure-tag "" --pirl-tag ""
 python scripts/graficos/plot_eval.py --first-seed 0 --last-seed 0
 ```
 

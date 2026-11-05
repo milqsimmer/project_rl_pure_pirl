@@ -47,7 +47,7 @@ There is no packaging or build pipeline; scripts are run directly.
 ### Tests and quick checks
 
 There is no `pytest` configuration; tests are small scripts under
-`scripts_test/`.
+`scripts/scripts_test/`.
 
 - Sanity check of Gym + NumPy:
 
@@ -98,7 +98,7 @@ If you want to add formal unit tests, prefer `pytest`, put them under a
   ```bash
   python eval_rl.py --mode pure --seed 0 --episodes 200 --max-steps 200 --target-seed 0
   python eval_rl.py --mode pirl --seed 0 --episodes 200 --max-steps 200 --target-seed 0
-  python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 --out results/eval_official_seed0 --target-seed 0
+  python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 --out results/eval_model0_target0_modeboth --target-seed 0
   ```
 
 - Sweep over seeds for training and evaluation (legacy helper):
@@ -136,15 +136,22 @@ If you want to add formal unit tests, prefer `pytest`, put them under a
   and model zip files under `runs/runs_pure/` and `runs/runs_pirl/`.
 - `eval_rl.py`: CLI that loads trained models, runs evaluation episodes,
   prints a summary table, and writes CSV plus JSON summary files.
-- `analyze_scales.py`: runs policies (random or trained) to measure
-  typical scales for distance, actions, torque and energy, and produces
-  bar plots.
-- `inspect_episodes.py`: more detailed rollouts with rich per-step
-  metrics and trajectory CSVs.
-- `run_experiments_seeds.py`: orchestrates training + evaluation over a
-  range of seeds by spawning `train_rl.py` and `eval_rl.py` as
-  subprocesses.
-- `scripts_test/`: small scripts used as sanity tests and visual debug.
+- `watch_train.py`, `watch_arm.py`: interactive helpers (curves / GUI).
+- `scripts/` (run everything from the project root):
+  - `analyze_scales.py`: runs policies (random or trained) to measure
+    typical scales for distance, actions, torque and energy, and produces
+    bar plots.
+  - `inspect_episodes.py`: more detailed rollouts with rich per-step
+    metrics and trajectory CSVs.
+  - `runs/`: `run_train_target_seeds.py`, `run_eval_target_seeds.py` and the
+    legacy `run_experiments_seeds.py`; they spawn `train_rl.py` and
+    `eval_rl.py` as subprocesses.
+  - `graficos/`: `plot_train.py`, `plot_eval.py`, `plot_arm_from_env.py`,
+    `script_plot_inspected_episodes.py`.
+  - `scripts_test/`: small scripts used as sanity tests and visual debug.
+- Data and outputs: `runs/runs_{pure,pirl}/` (training), `results/`
+  (eval CSV/JSON), `tabelas/` (aggregated tables), `figs/` (figures),
+  `docs/` (notes and plan).
 
 ## 5. Python style guidelines
 
@@ -237,7 +244,7 @@ If you want to add formal unit tests, prefer `pytest`, put them under a
 - Keep backward compatibility with existing command line interfaces
   where reasonable; add new flags rather than renaming old ones.
 - Prefer adding new analysis scripts next to the existing ones in this
-  directory or under `scripts_test/` for quick sanity checks.
+  directory (`scripts/`) or under `scripts/scripts_test/` for quick sanity checks.
 
 ## 9. Updated training / eval / plotting (2026-10)
 
@@ -285,10 +292,10 @@ interfaces. New agents should prefer the newer helpers when possible.
     metrics used by plotting scripts.
 
 - Helper scripts for sweeps and plotting (new):
-  - `run_train_target_seeds.py`: trains `pure` and `pirl` for an interval
+  - `scripts/runs/run_train_target_seeds.py`: trains `pure` and `pirl` for an interval
     of seeds, using the same integer as both PPO seed and
     `target_seed` (one run per mode×seed).
-  - `run_eval_target_seeds.py`: evaluates models over a range of
+  - `scripts/runs/run_eval_target_seeds.py`: evaluates models over a range of
     `model_seeds`, optionally paired with a different range of
     `target_seeds` (for cross-generalization).
   - `scripts/graficos/plot_train.py`: reads `monitor.csv` files of the
@@ -300,15 +307,24 @@ interfaces. New agents should prefer the newer helpers when possible.
     (`tabelas/resumo_geral_todos_csvs.csv`, `resumo_por_seed.csv`,
     `target_distance_success.csv`) and the pure vs pirl figures (boxplots,
     per-seed bars, mean±std summaries, energy x success trade-off, success vs
-    initial tip–target distance, safe success). Select with `--figures`.
+    initial tip–target distance). Select with `--figures`.
   - `watch_train.py` and `watch_arm.py` are interactive helpers for
     monitoring reward/success curves and 2D arm motion during/after
     training; they should not change training behavior.
 
 - Extra plotting / analysis scripts (under `scripts/`):
-  - `inspect_episodes.py` + `script_plot_inspected_episodes.py`:
+  - `inspect_episodes.py` + `graficos/script_plot_inspected_episodes.py`:
     generate detailed CSVs and figures for a few representative
     episodes (low/high energy successes and a high-energy failure).
+  - `graficos/plot_arm_from_env.py`: draws the 2D arm reaching a sampled
+    target and saves the SVG to `figs/figs_env/`.
+
+- Official runs and pirl reward history:
+  - Official run tags: `md02` (pure) and `md02_at2e4` (pirl,
+    `alpha_tau=2e-4`), seeds 0–10 (evals for seeds 1–10 in `results/`).
+  - The `md02_at2e4` runs were trained with the earlier per-step torque
+    penalty in `pirl`. The terminal-only torque penalty described above is
+    used by the later `*_term` runs.
 
 ## 10. Current tuning plan (2026-10): pure first, then pirl
 

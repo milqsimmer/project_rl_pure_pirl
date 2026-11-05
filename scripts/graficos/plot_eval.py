@@ -19,8 +19,6 @@ Figuras (--out-dir, default figs/figs_resultados/), escolhidas com --figures:
     summary-effort fig6_resumo_torque_energia.pdf     subconjunto da fig3 (esforço)
     mean-success   fig_sucesso_medio_pure_pirl.pdf    sucesso médio (todos os episódios)
     mean-effort    fig_torque_energia_medio_pure_pirl.pdf
-    safe-success   fig_sucesso_vs_sucesso_seguro_pure_pirl.pdf
-                   (requer tabelas/safety_metrics.csv, gerado por script_safety_metrics.py)
     target-distance fig_target_distance_success.pdf   sucesso x distância inicial
     seed-bars      fig_per_seed_{success_rate,final_dist,tau_effort,energy}.pdf
                    e fig_per_seed_grid.pdf            barras pure x pirl por seed
@@ -380,35 +378,6 @@ def fig_mean_effort(general, out_dir, **_) -> None:
     save_fig(fig, out_dir, "fig_torque_energia_medio_pure_pirl.pdf")
 
 
-def fig_safe_success(seed_summary, out_dir, safety_csv: str, **_) -> None:
-    if not os.path.isfile(safety_csv):
-        print(f"[plot_eval] {safety_csv} não encontrado "
-              "(rode script_safety_metrics.py); safe-success ignorado.")
-        return
-    sm = pd.read_csv(safety_csv)
-    sm["mode_norm"] = sm["mode"].apply(normalize_mode)
-
-    def get(mode, col):
-        return float(sm[sm["mode_norm"] == mode][col].iloc[0])
-
-    succ = [get(m, "success_rate") for m in MODES]
-    safe = [get(m, "safe_success_rate") for m in MODES]
-    x, width = [0, 1], 0.35
-    fig, ax = plt.subplots(figsize=(5, 4))
-    ax.bar([xi - width / 2 for xi in x], succ, width, label="Sucesso total", color="C0", alpha=0.4)
-    ax.bar([xi + width / 2 for xi in x], safe, width, label="Sucesso seguro", color="C0")
-    ax.set_xticks(x)
-    ax.set_xticklabels([LABELS[m] for m in MODES])
-    ax.set_ylabel("Taxa de sucesso")
-    ax.set_ylim(0.0, 1.0)
-    ax.set_title(f"Sucesso total vs sucesso seguro ({seeds_text(seed_summary)})")
-    ax.legend(loc="best")
-    for xi, s, ss in zip(x, succ, safe):
-        ax.text(xi - width / 2, s + 0.01, f"{s:.2f}", ha="center", va="bottom", fontsize=8)
-        ax.text(xi + width / 2, ss + 0.01, f"{ss:.2f}", ha="center", va="bottom", fontsize=8)
-    save_fig(fig, out_dir, "fig_sucesso_vs_sucesso_seguro_pure_pirl.pdf")
-
-
 def fig_target_distance(target_table, out_dir, **_) -> None:
     if target_table is None:
         return
@@ -436,7 +405,6 @@ FIGURES = {
     "summary-effort": fig_summary_effort,
     "mean-success": fig_mean_success,
     "mean-effort": fig_mean_effort,
-    "safe-success": fig_safe_success,
     "target-distance": fig_target_distance,
     "seed-bars": fig_seed_bars,
 }
@@ -461,10 +429,6 @@ def parse_args() -> argparse.Namespace:
     )
     ap.add_argument("--out-dir", default="figs/figs_resultados")
     ap.add_argument("--tables-dir", default="tabelas")
-    ap.add_argument(
-        "--safety-csv", default="tabelas/safety_metrics.csv",
-        help="Tabela de script_safety_metrics.py, usada em safe-success.",
-    )
     return ap.parse_args()
 
 
@@ -500,7 +464,6 @@ def main() -> None:
         seed_summary=seed_summary,
         target_table=target_table,
         out_dir=args.out_dir,
-        safety_csv=args.safety_csv,
     )
     for name in wanted:
         FIGURES[name](**ctx)
