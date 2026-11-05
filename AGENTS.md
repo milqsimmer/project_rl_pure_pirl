@@ -291,38 +291,21 @@ interfaces. New agents should prefer the newer helpers when possible.
   - `run_eval_target_seeds.py`: evaluates models over a range of
     `model_seeds`, optionally paired with a different range of
     `target_seeds` (for cross-generalization).
-  - `plot_train_compare.py`: reads `monitor.csv` files and produces
-    per-mode training curves (reward + success) and success-per-seed
-    figures; `run_plots_train.py` wraps this for a seed range.
-  - `plot_eval_compare.py`: reads the `_summary.json` files from
-    `eval_rl.py` and generates comparison plots pure vs pirl per seed
-    (success rate, final distance, torque effort, energy, plus a 2×2
-    grid figure). `run_plots_eval_all.py` orchestrates this and can
-    optionally re-run `analyze_scales.py` per seed.
-  - `run_plots_results_paper.py`: high-level pipeline intended for
-    dissertation figures. It calls, in order:
-    1) `run_plots_train.py` (training curves),
-    2) `run_plots_eval_all.py` (pure vs pirl eval),
-    3) `scripts/graficos/script_plot_train.py` (aggregate train PDFs),
-    4) `scripts/graficos/script_graficos_v3.py` (eval tables),
-    5) `scripts/graficos/script_target_distance_success.py` (success vs
-       initial radius),
-    6) optionally `inspect_episodes.py` and
-       `scripts/graficos/script_plot_inspected_episodes.py` for detailed
-       per-episode figures.
+  - `scripts/graficos/plot_train.py`: reads `monitor.csv` files of the
+    official runs (tags `md02` / `md02_at2e4`) and produces aggregate
+    mean±std PDFs, per-seed comparison and success-per-seed figures
+    (`--figures aggregate,compare,per-seed`).
+  - `scripts/graficos/plot_eval.py`: reads the per-episode eval CSVs
+    (`results/eval_model*_target*_mode*_*.csv`), writes the summary tables
+    (`tabelas/resumo_geral_todos_csvs.csv`, `resumo_por_seed.csv`,
+    `target_distance_success.csv`) and the pure vs pirl figures (boxplots,
+    per-seed bars, mean±std summaries, energy x success trade-off, success vs
+    initial tip–target distance, safe success). Select with `--figures`.
   - `watch_train.py` and `watch_arm.py` are interactive helpers for
     monitoring reward/success curves and 2D arm motion during/after
     training; they should not change training behavior.
 
-- Extra plotting / analysis scripts (under `scripts/graficos/`):
-  - `script_plot_train.py`: aggregates training curves across seeds and
-    saves mean±std PDFs for reward, success and final distance.
-  - `script_graficos_v3.py`: ingests all
-    `results/eval_official_seed*_*.csv`, normalizes mode names and
-    writes global and per-seed summary tables (CSV).
-  - `script_target_distance_success.py`: studies success rate as a
-    function of initial tip–target distance by binning `tip_init_dist`
-    from eval CSVs and plotting pure vs pirl.
+- Extra plotting / analysis scripts (under `scripts/`):
   - `inspect_episodes.py` + `script_plot_inspected_episodes.py`:
     generate detailed CSVs and figures for a few representative
     episodes (low/high energy successes and a high-energy failure).
@@ -363,8 +346,8 @@ then gradually add physics-informed terms for `pirl`.
 - Phase 3 – Validate `pure` on multiple seeds
   - Fix the chosen `pure` hyperparameters and train/evaluate seeds
     0–4.
-  - Use `run_plots_train.py` and `run_plots_eval_all.py` (or
-    `run_plots_results_paper.py`) to inspect success rate across seeds.
+  - Use `scripts/graficos/plot_train.py` and `plot_eval.py` to inspect
+    success rate across seeds.
   - Aim for mean success ≥70% with no catastrophic seeds.
 
   - Current baseline (2026-10): after coarse tuning on seed 0 and

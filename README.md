@@ -39,7 +39,7 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 │   │   ├── run_experiments_seeds.py   # Pipeline legado de treino+avaliação para várias seeds
 │   │   ├── run_train_target_seeds.py  # Treino pure/pirl com seed = target_seed
 │   │   └── run_eval_target_seeds.py   # Eval usando pares (model_seed, target_seed)
-│   ├── graficos/             # Gráficos/tabelas (plot_*, run_plots_*, script_*)
+│   ├── graficos/             # Gráficos/tabelas (plot_train, plot_eval, ...)
 │   └── scripts_test/         # demo_inicial, test_env, test_tip_visual, sanity_check
 ├── figs/                     # figs_env, figs_resultados, figs_treino, figs_episodios_inspecao
 ├── tabelas/                  # Tabelas CSV agregadas
@@ -212,9 +212,8 @@ python scripts/runs/run_eval_target_seeds.py --mode both --model-first-seed 0 --
   - Geração de gráficos e tabelas agregadas (sucesso, distância, esforço, energia)
   a partir dos CSVs de avaliação oficial:
   ```bash
-  python scripts/graficos/run_plots_train.py --first-seed 0 --last-seed 4
-  python scripts/graficos/run_plots_eval_all.py --first-seed 0 --last-seed 4
-  python scripts/graficos/run_plots_results_paper.py --first-seed 0 --last-seed 4 --include-inspected
+  python scripts/graficos/plot_train.py --seeds 0-4
+  python scripts/graficos/plot_eval.py --first-seed 0 --last-seed 4
   ```
 
 
@@ -238,7 +237,8 @@ python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 0 \
     --episodes-per-config 20 --max-steps 200
 
 # 4) Geração de gráficos e tabelas agregadas
-python scripts/graficos/run_plots_results_paper.py --first-seed 0 --last-seed 0 --include-inspected
+python scripts/graficos/plot_train.py --seeds 0
+python scripts/graficos/plot_eval.py --first-seed 0 --last-seed 0
 ```
 
 

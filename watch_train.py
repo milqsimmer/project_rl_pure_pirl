@@ -93,7 +93,7 @@ def main() -> None:
             plt.pause(args.interval)
             continue
 
-        # eixo x em timesteps acumulados (como em script_plot_train.py)
+        # eixo x em timesteps acumulados (como em plot_train.py)
         # coluna "l" = comprimento do episódio
         timesteps = df["l"].cumsum()
 
