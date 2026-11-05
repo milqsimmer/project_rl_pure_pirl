@@ -36,9 +36,9 @@ FIGURES = ("aggregate", "compare", "per-seed")
 
 # ========= I/O =========
 def get_monitor_path(mode: str, seed: int, run_tag: str = "") -> str:
-    """Replica a convenção de pastas de train_rl.py (runs_pure/seed_0_md02)."""
+    """Replica a convenção de pastas de train_rl.py (runs/runs_pure/seed_0_md02)."""
     suffix = f"_{run_tag}" if run_tag else ""
-    return os.path.join(f"runs_{mode}", f"seed_{seed}{suffix}", "monitor.csv")
+    return os.path.join("runs", f"runs_{mode}", f"seed_{seed}{suffix}", "monitor.csv")
 
 
 def read_monitor(path: str) -> pd.DataFrame | None:

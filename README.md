@@ -44,8 +44,9 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 ├── figs/                     # figs_env, figs_resultados, figs_treino, figs_episodios_inspecao
 ├── tabelas/                  # Tabelas CSV agregadas
 ├── docs/                     # Notas de experimentos, plano, requirements legado
-├── runs_pure/                # Saídas de treino PPO (modo "pure")
-├── runs_pirl/                # Saídas de treino PPO (modo "pirl")
+├── runs/                     # Saídas de treino PPO
+│   ├── runs_pure/            #   modo "pure"
+│   └── runs_pirl/            #   modo "pirl"
 ├── results/                  # CSVs/JSONs de avaliação gerados por eval_rl.py
 ├── two_link_arm.urdf         # Modelo URDF do braço
 ├── requirements.txt          # Dependências do projeto
@@ -140,8 +141,8 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 >   seed veem a mesma sequência de alvos)
 
 4. Saídas dos treinos:
-    - `runs_pure/seed_<seed>/monitor.csv` e `runs_pure/seed_<seed>/ppo_model_<seed>.zip`.
-    - `runs_pirl/seed_<seed>/monitor.csv` e `runs_pirl/seed_<seed>/ppo_model_<seed>.zip`.
+    - `runs/runs_pure/seed_<seed>/monitor.csv` e `runs/runs_pure/seed_<seed>/ppo_model_<seed>.zip`.
+    - `runs/runs_pirl/seed_<seed>/monitor.csv` e `runs/runs_pirl/seed_<seed>/ppo_model_<seed>.zip`.
 
 
 ### Avaliação

@@ -133,7 +133,7 @@ If you want to add formal unit tests, prefer `pytest`, put them under a
   PyBullet, with reward modes `pure` and `pirl` and detailed info
   fields in `info`.
 - `train_rl.py`: CLI that trains PPO policies and saves monitor CSVs
-  and model zip files under `runs_pure/` and `runs_pirl/`.
+  and model zip files under `runs/runs_pure/` and `runs/runs_pirl/`.
 - `eval_rl.py`: CLI that loads trained models, runs evaluation episodes,
   prints a summary table, and writes CSV plus JSON summary files.
 - `analyze_scales.py`: runs policies (random or trained) to measure

@@ -33,7 +33,7 @@ from two_link_arm_env import TwoLinkArmEnv
 
 def get_model_path(mode: str, seed: int) -> str:
     """Constroi o caminho padrao do modelo treinado."""
-    run_dir = os.path.join(f"runs_{mode}", f"seed_{seed}")
+    run_dir = os.path.join("runs", f"runs_{mode}", f"seed_{seed}")
     return os.path.join(run_dir, f"ppo_model_{seed}.zip")
 
 

@@ -18,7 +18,7 @@ def set_global_seed(seed: int):
 
 def get_run_dir(mode: str, seed: int, run_tag: str = "") -> str:
     suffix = f"_" + run_tag if run_tag else ""
-    return os.path.join(f"runs_{mode}", f"seed_{seed}{suffix}")
+    return os.path.join("runs", f"runs_{mode}", f"seed_{seed}{suffix}")
 
 
 def get_model_path(mode: str, seed: int, run_tag: str = "") -> str:
