@@ -444,9 +444,10 @@ def main() -> None:
                 runs.append({"seed": s, "run_tag": run_tag, "label": label})
 
             # modo automático: descobrir todos os run_tags por seed quando
-            # o usuário pediu apenas sucesso por seed e não especificou
-            # run-tag nem lista de runs.
-            if args.only_success_per_seed and not args.run_tag:
+            # o usuário não especificou run-tag nem lista de runs. Isso
+            # permite pegar, por exemplo, runs "seed_X_md02" sem precisar
+            # passar --run-tag manualmente.
+            if not args.run_tag:
                 auto_runs = discover_runs_for_seeds(mode, base_seeds)
                 if auto_runs:
                     runs = auto_runs

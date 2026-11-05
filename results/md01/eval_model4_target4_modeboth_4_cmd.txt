@@ -1,0 +1,13 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode both --seed 4 --episodes 200 --max-steps 200 --target-seed 4 --out results/eval_model4_target4_modeboth --run-tag at2e4
+args_json: {
+  "mode": "both",
+  "seed": 4,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/eval_model4_target4_modeboth",
+  "print_episodes": false,
+  "run_tag": "at2e4",
+  "target_seed": 4,
+  "success_bonus": 0.0
+}

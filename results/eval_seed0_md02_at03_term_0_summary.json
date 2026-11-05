@@ -1,0 +1,17 @@
+[
+  {
+    "mode": "pirl",
+    "seed": 0,
+    "episodes": 200,
+    "success_rate": 0.965,
+    "mean_final_dist": 0.0510156005054007,
+    "std_final_dist": 0.022565714013208983,
+    "mean_ep_len": 88.95,
+    "std_ep_len": 34.51677128585465,
+    "mean_tau_effort": 1.4875703407294305,
+    "std_tau_effort": 0.9851777267738501,
+    "median_tau_effort": 1.1668802948262431,
+    "mean_energy": 1.2976499076064933,
+    "std_energy": 0.26420450375160975
+  }
+]

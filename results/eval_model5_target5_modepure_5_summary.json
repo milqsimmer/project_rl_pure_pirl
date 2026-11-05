@@ -1,0 +1,17 @@
+[
+  {
+    "mode": "pure",
+    "seed": 5,
+    "episodes": 200,
+    "success_rate": 0.75,
+    "mean_final_dist": 0.1545664669919401,
+    "std_final_dist": 0.20389835216809138,
+    "mean_ep_len": 110.055,
+    "std_ep_len": 58.243471522566374,
+    "mean_tau_effort": 1.5360355196955369,
+    "std_tau_effort": 1.147331264777969,
+    "median_tau_effort": 1.2719956700007473,
+    "mean_energy": 1.5037629961880838,
+    "std_energy": 0.5245233179316202
+  }
+]

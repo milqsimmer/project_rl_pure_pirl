@@ -6,9 +6,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ========= CONFIGURAÇÕES GERAIS =========
-# Por padrão, lê todos os CSVs de avaliação oficial gerados por run_experiments_seeds.py,
-# que têm o padrão: results/eval_official_seed<seed>_<seed>.csv
-CSV_GLOB = r"results/eval_official_seed*_*.csv"
+# Por padrão, lê todos os CSVs de avaliação oficial gerados pelos scripts
+# antigos (run_experiments_seeds.py), que têm o padrão
+# results/eval_official_seed<seed>_<seed>.csv, e também os CSVs no formato
+# mais novo gerados por eval_rl.py com prefixos do tipo
+# results/eval_model<seed>_target<seed>_mode{pure,pirl}_<seed>.csv.
+CSV_GLOBS = [
+    r"results/eval_official_seed*_*.csv",
+    r"results/eval_model*_target*_mode*_*.csv",
+]
 OUT_DIR = r"figs_resultados"
 TABELAS_DIR = r"tabelas"
 
@@ -37,15 +43,21 @@ def extract_seed_from_filename(path):
     Exemplos aceitos:
     - eval_official_seed0_0.csv -> 0
     - eval_official_seed3_3.csv -> 3
+    - eval_model1_target1_modepure_1.csv -> 1
 
     Mantém compatibilidade com o formato antigo "eval_results_0.csv".
     """
     name = os.path.basename(path)
 
-    # Novo padrão: eval_official_seed<seed>_<seed>.csv
+    # Padrão "novo oficial": eval_official_seed<seed>_<seed>.csv
     m_new = re.search(r"eval_official_seed(\d+)_\d+\.csv$", name)
     if m_new:
         return int(m_new.group(1))
+
+    # Padrão novo baseado em eval_rl.py: eval_model<seed>_target<seed>_mode..._*.csv
+    m_model = re.search(r"eval_model(\d+)_target\d+_mode[^_]+_\d+\.csv$", name)
+    if m_model:
+        return int(m_model.group(1))
 
     # Padrão legado: eval_results_<seed>.csv
     m_old = re.search(r"eval_results_(\d+)\.csv$", name)
@@ -130,9 +142,14 @@ def resumo_metrica(df_mode):
 
 
 # ========= LEITURA DE TODOS OS CSVs =========
-csv_files = sorted(glob.glob(CSV_GLOB))
+csv_files = []
+for pattern in CSV_GLOBS:
+    csv_files.extend(glob.glob(pattern))
+csv_files = sorted(set(csv_files))
 if not csv_files:
-    raise FileNotFoundError(f"Nenhum arquivo encontrado com o padrão: {CSV_GLOB}")
+    raise FileNotFoundError(
+        f"Nenhum arquivo encontrado com os padrões: {', '.join(CSV_GLOBS)}"
+    )
 
 dfs = []
 for path in csv_files:

@@ -3,8 +3,12 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
-CSV_GLOB = r"results/eval_official_seed*_*.csv"
+# Aceita tanto o formato antigo (eval_official_seed<seed>_<seed>.csv)
+# quanto o formato mais novo (eval_model<seed>_target<seed>_mode*.csv).
+CSV_GLOBS = [
+    r"results/eval_official_seed*_*.csv",
+    r"results/eval_model*_target*_mode*_*.csv",
+]
 OUT_DIR = "figs_resultados"
 TABELAS_DIR = "tabelas"
 
@@ -38,9 +42,14 @@ def main() -> None:
     os.makedirs(OUT_DIR, exist_ok=True)
     os.makedirs(TABELAS_DIR, exist_ok=True)
 
-    paths = sorted(glob.glob(CSV_GLOB))
+    paths: list[str] = []
+    for pattern in CSV_GLOBS:
+        paths.extend(glob.glob(pattern))
+    paths = sorted(set(paths))
     if not paths:
-        raise SystemExit(f"Nenhum CSV encontrado com padrão: {CSV_GLOB}")
+        raise SystemExit(
+            f"Nenhum CSV encontrado com padrões: {', '.join(CSV_GLOBS)}"
+        )
 
     dfs = [read_csv_auto(p) for p in paths]
     df = pd.concat(dfs, ignore_index=True)
