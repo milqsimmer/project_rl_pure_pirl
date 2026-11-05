@@ -140,10 +140,11 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 > - `target_seed` por padrão igual a `seed` (pure e pirl com a mesma
 >   seed veem a mesma sequência de alvos)
 >
-> Runs oficiais (tags usadas por `plot_train.py`): pure com `--run-tag md02`
-> e pirl com `--alpha-tau 2e-4 --run-tag md02_at2e4`, seeds 0 a 10. As runs
+> Runs oficiais: pure com `--run-tag md02` e pirl com `--alpha-tau 2e-4 --run-tag md02_at2e4`,
+> seeds 0 a 10. O `plot_train.py` não tem tag padrão: passe `--pure-tag` e `--pirl-tag`. As runs
 > `md02_at2e4` foram treinadas com a penalização de torque por passo
-> (versão anterior do reward); as runs `*_term` usam a penalização terminal.
+> (versão anterior do reward); as runs `*_term` usam a penalização terminal,
+> com `alpha_tau = 0.3` (`md02_at03_term`) como valor escolhido.
 
 4. Saídas dos treinos:
     - `runs/runs_pure/seed_<seed>[_<run-tag>]/monitor.csv` e `ppo_model_<seed>.zip`.
@@ -225,7 +226,7 @@ python scripts/runs/run_eval_target_seeds.py --mode both --model-first-seed 0 --
 
 - Geração de gráficos e tabelas agregadas (sucesso, distância, esforço, energia):
   ```bash
-  python scripts/graficos/plot_train.py --seeds 1-10        # curvas de treino -> figs/figs_treino/
+  python scripts/graficos/plot_train.py --seeds 1-10 --pure-tag <tag_pure> --pirl-tag <tag_pirl>   # -> figs/figs_treino/
   python scripts/graficos/plot_eval.py --first-seed 1 --last-seed 10   # tabelas/ e figs/figs_resultados/
   python scripts/graficos/plot_arm_from_env.py              # figura do braço -> figs/figs_env/
   ```

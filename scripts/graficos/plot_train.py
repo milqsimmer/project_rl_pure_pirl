@@ -1,7 +1,7 @@
 """Gráficos de treino a partir dos monitor.csv do Stable-Baselines3.
 
-Executar a partir da raiz do projeto. Lê runs_<mode>/seed_<seed>_<tag>/monitor.csv
-(convenção de train_rl.py) e gera, em --out-dir (default figs/figs_treino):
+Executar a partir da raiz do projeto. Lê
+runs/runs_<mode>/seed_<seed>_<tag>/monitor.csv (convenção de train_rl.py) e gera, em --out-dir (default figs/figs_treino):
 
   agregado (--figures aggregate)  PDF, média ± desvio entre seeds, pure x pirl
       fig_treino_reward.pdf, fig_treino_sucesso.pdf, fig_treino_distancia_final.pdf
@@ -10,10 +10,12 @@ Executar a partir da raiz do projeto. Lê runs_<mode>/seed_<seed>_<tag>/monitor.
   por seed (--figures per-seed)   PNG, sucesso com um subplot por seed
       train_compare_<mode>_success_per_seed.png
 
+O run_tag das runs é obrigatório e não tem padrão: informe --pure-tag e/ou
+--pirl-tag (ou --run-tag, comum aos modos). Use "" para runs sem tag.
+
 Exemplos:
-  python scripts/graficos/plot_train.py --seeds 1-10
-  python scripts/graficos/plot_train.py --seeds 0-4 --figures aggregate
-  python scripts/graficos/plot_train.py --seeds 0-4 --pure-tag md02 --pirl-tag md02_at3e4
+  python scripts/graficos/plot_train.py --seeds 1-10 --pure-tag <tag_pure> --pirl-tag <tag_pirl>
+  python scripts/graficos/plot_train.py --seeds 0-4 --mode pure --pure-tag <tag_pure> --figures aggregate
 """
 
 import argparse
@@ -27,9 +29,6 @@ LABELS = {
     "pure": "RL puro",
     "pirl": "PIRL (PI-reward)",
 }
-
-# run_tag das runs oficiais (config md02; pirl com alpha_tau=2e-4)
-DEFAULT_TAGS = {"pure": "md02", "pirl": "md02_at2e4"}
 
 FIGURES = ("aggregate", "compare", "per-seed")
 
@@ -223,14 +222,12 @@ def parse_args() -> argparse.Namespace:
     )
     ap.add_argument("--mode", choices=["pure", "pirl", "both"], default="both")
     ap.add_argument("--seeds", default="0-4", help="Ex.: 0,1,2 ou 1-10.")
-    ap.add_argument(
-        "--run-tag", default="",
-        help="run_tag comum aos dois modos (sobrescreve os defaults; vazio = defaults).",
-    )
+    ap.add_argument("--run-tag", default=None,
+                    help="run_tag comum aos modos selecionados (use \"\" para runs sem tag).")
     ap.add_argument("--pure-tag", default=None,
-                    help=f"run_tag do pure (default: {DEFAULT_TAGS['pure']}).")
+                    help="run_tag do pure (tem prioridade sobre --run-tag).")
     ap.add_argument("--pirl-tag", default=None,
-                    help=f"run_tag do pirl (default: {DEFAULT_TAGS['pirl']}).")
+                    help="run_tag do pirl (tem prioridade sobre --run-tag).")
     ap.add_argument("--window", type=int, default=1000,
                     help="Janela da média móvel, em episódios.")
     ap.add_argument("--max-timesteps", type=int, default=2_000_000,
@@ -250,13 +247,13 @@ def main() -> None:
         raise SystemExit(f"--figures inválido: {sorted(unknown)}; use {FIGURES}")
 
     modes = ["pure", "pirl"] if args.mode == "both" else [args.mode]
-    tags = dict(DEFAULT_TAGS)
-    if args.run_tag:
-        tags = {m: args.run_tag for m in tags}
-    if args.pure_tag is not None:
-        tags["pure"] = args.pure_tag
-    if args.pirl_tag is not None:
-        tags["pirl"] = args.pirl_tag
+    specific = {"pure": args.pure_tag, "pirl": args.pirl_tag}
+    tags = {m: specific[m] if specific[m] is not None else args.run_tag for m in modes}
+    missing = [f"--{m}-tag" for m in modes if tags[m] is None]
+    if missing:
+        raise SystemExit(
+            f"Informe o run_tag: {' e '.join(missing)} (ou --run-tag); não há padrão."
+        )
 
     os.makedirs(args.out_dir, exist_ok=True)
 

@@ -298,8 +298,8 @@ interfaces. New agents should prefer the newer helpers when possible.
   - `scripts/runs/run_eval_target_seeds.py`: evaluates models over a range of
     `model_seeds`, optionally paired with a different range of
     `target_seeds` (for cross-generalization).
-  - `scripts/graficos/plot_train.py`: reads `monitor.csv` files of the
-    official runs (tags `md02` / `md02_at2e4`) and produces aggregate
+  - `scripts/graficos/plot_train.py`: reads `monitor.csv` files of the runs
+    selected with `--pure-tag` / `--pirl-tag` (no default tags) and produces aggregate
     mean±std PDFs, per-seed comparison and success-per-seed figures
     (`--figures aggregate,compare,per-seed`).
   - `scripts/graficos/plot_eval.py`: reads the per-episode eval CSVs
@@ -324,7 +324,8 @@ interfaces. New agents should prefer the newer helpers when possible.
     `alpha_tau=2e-4`), seeds 0–10 (evals for seeds 1–10 in `results/`).
   - The `md02_at2e4` runs were trained with the earlier per-step torque
     penalty in `pirl`. The terminal-only torque penalty described above is
-    used by the later `*_term` runs.
+    used by the later `*_term` runs, where the chosen value is
+    `alpha_tau = 0.3` (run-tag `md02_at03_term`).
 
 ## 10. Current tuning plan (2026-10): pure first, then pirl
 
