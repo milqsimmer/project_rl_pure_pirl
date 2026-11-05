@@ -26,6 +26,8 @@ import numpy as np
 from gym.wrappers import TimeLimit
 from stable_baselines3 import PPO
 
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..")))  # raiz do projeto
 from two_link_arm_env import TwoLinkArmEnv
 
 

@@ -52,26 +52,26 @@ There is no `pytest` configuration; tests are small scripts under
 - Sanity check of Gym + NumPy:
 
   ```bash
-  python scripts_test/sanity_check.py
+  python scripts/scripts_test/sanity_check.py
   ```
 
 - Inverse kinematics + environment distance check (closest thing to a
   single focused test):
 
   ```bash
-  python scripts_test/test_env.py
+  python scripts/scripts_test/test_env.py
   ```
 
 - Visual debug of tip vs target in the PyBullet GUI:
 
   ```bash
-  python scripts_test/test_tip_visual.py
+  python scripts/scripts_test/test_tip_visual.py
   ```
 
 - Demo of the original PyBullet simulation (no RL):
 
   ```bash
-  python scripts_test/demo_inicial.py
+  python scripts/scripts_test/demo_inicial.py
   ```
 
 If you want to add formal unit tests, prefer `pytest`, put them under a
@@ -104,26 +104,26 @@ If you want to add formal unit tests, prefer `pytest`, put them under a
 - Sweep over seeds for training and evaluation (legacy helper):
 
   ```bash
-  python run_experiments_seeds.py --first-seed 0 --last-seed 4
+  python scripts/runs/run_experiments_seeds.py --first-seed 0 --last-seed 4
   ```
 
 - New helpers for sweeps with target_seeds:
 
   ```bash
-  python run_train_target_seeds.py --first-seed 0 --last-seed 4 --steps 2000000
-  python run_eval_target_seeds.py  --mode both --model-first-seed 0 --model-last-seed 4
+  python scripts/runs/run_train_target_seeds.py --first-seed 0 --last-seed 4 --steps 2000000
+  python scripts/runs/run_eval_target_seeds.py  --mode both --model-first-seed 0 --model-last-seed 4
   ```
 
 - Analysis of scales (distance, action norm, torque, energy):
 
   ```bash
-  python analyze_scales.py --mode both --policy trained
+  python scripts/analyze_scales.py --mode both --policy trained
   ```
 
 - Detailed per-step inspection and CSV dumps:
 
   ```bash
-  python inspect_episodes.py --mode both --first-seed 0 --last-seed 4 \
+  python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 4 \
       --episodes-per-config 20 --max-steps 200
   ```
 
@@ -303,18 +303,18 @@ interfaces. New agents should prefer the newer helpers when possible.
     dissertation figures. It calls, in order:
     1) `run_plots_train.py` (training curves),
     2) `run_plots_eval_all.py` (pure vs pirl eval),
-    3) `scripts_graficos/script_plot_train.py` (aggregate train PDFs),
-    4) `scripts_graficos/script_graficos_v3.py` (eval tables),
-    5) `scripts_graficos/script_target_distance_success.py` (success vs
+    3) `scripts/graficos/script_plot_train.py` (aggregate train PDFs),
+    4) `scripts/graficos/script_graficos_v3.py` (eval tables),
+    5) `scripts/graficos/script_target_distance_success.py` (success vs
        initial radius),
     6) optionally `inspect_episodes.py` and
-       `scripts_graficos/script_plot_inspected_episodes.py` for detailed
+       `scripts/graficos/script_plot_inspected_episodes.py` for detailed
        per-episode figures.
   - `watch_train.py` and `watch_arm.py` are interactive helpers for
     monitoring reward/success curves and 2D arm motion during/after
     training; they should not change training behavior.
 
-- Extra plotting / analysis scripts (under `scripts_graficos/`):
+- Extra plotting / analysis scripts (under `scripts/graficos/`):
   - `script_plot_train.py`: aggregates training curves across seeds and
     saves mean±std PDFs for reward, success and final distance.
   - `script_graficos_v3.py`: ingests all

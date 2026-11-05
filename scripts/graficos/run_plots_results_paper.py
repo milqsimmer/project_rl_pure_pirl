@@ -74,7 +74,7 @@ def main() -> None:
     run_cmd(
         [
             py,
-            "run_plots_train.py",
+            "scripts/graficos/run_plots_train.py",
             "--first-seed",
             str(args.first_seed),
             "--last-seed",
@@ -86,7 +86,7 @@ def main() -> None:
     run_cmd(
         [
             py,
-            "run_plots_eval_all.py",
+            "scripts/graficos/run_plots_eval_all.py",
             "--first-seed",
             str(args.first_seed),
             "--last-seed",
@@ -103,17 +103,17 @@ def main() -> None:
     #    - fig_treino_reward.pdf
     #    - fig_treino_sucesso.pdf
     #    - fig_treino_distancia_final.pdf
-    run_cmd([py, "scripts_graficos/script_plot_train.py"])
+    run_cmd([py, "scripts/graficos/script_plot_train.py"])
 
     # 4) Tabelas e resumos globais de avaliacao (script_graficos_v3)
     #    - tabelas/resumo_geral_todos_csvs.csv
     #    - tabelas/resumo_por_seed.csv
-    run_cmd([py, "scripts_graficos/script_graficos_v3.py"])
+    run_cmd([py, "scripts/graficos/script_graficos_v3.py"])
 
     # 5) Sucesso em funcao da distancia inicial da ponta ao alvo
     #    - tabelas/target_distance_success.csv
-    #    - figs_resultados/fig_target_distance_success.pdf
-    run_cmd([py, "scripts_graficos/script_target_distance_success.py"])
+    #    - figs/figs_resultados/fig_target_distance_success.pdf
+    run_cmd([py, "scripts/graficos/script_target_distance_success.py"])
 
     # 6) Episodios inspecionados (opcional)
     if args.include_inspected:
@@ -125,7 +125,7 @@ def main() -> None:
         run_cmd(
             [
                 py,
-                "inspect_episodes.py",
+                "scripts/inspect_episodes.py",
                 "--mode",
                 "both",
                 "--seeds",
@@ -138,7 +138,7 @@ def main() -> None:
         )
 
         # 6b) Gera figuras a partir dos CSVs de inspeção
-        run_cmd([py, "scripts_graficos/script_plot_inspected_episodes.py"])
+        run_cmd([py, "scripts/graficos/script_plot_inspected_episodes.py"])
 
 
 if __name__ == "__main__":

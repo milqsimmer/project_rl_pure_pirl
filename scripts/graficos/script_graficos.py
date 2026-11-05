@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 
 # ========= CONFIGURAÇÕES GERAIS =========
 CSV_PATH = r"eval_results.csv"
-OUT_DIR = r"figs_resultados"
+OUT_DIR = r"figs/figs_resultados"
 TABELAS_DIR = r"tabelas"
 
 # ========= LABELS =========

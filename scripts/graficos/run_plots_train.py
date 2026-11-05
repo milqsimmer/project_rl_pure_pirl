@@ -48,7 +48,7 @@ def main() -> None:
     # 1) Graficos completos (reward + sucesso) para pure e pirl
     cmd_full = [
         py,
-        "plot_train_compare.py",
+        "scripts/graficos/plot_train_compare.py",
         "--mode",
         "both",
         "--seeds",
@@ -59,7 +59,7 @@ def main() -> None:
     # 2) Graficos de sucesso por seed (um subplot por seed)
     cmd_success = [
         py,
-        "plot_train_compare.py",
+        "scripts/graficos/plot_train_compare.py",
         "--mode",
         "both",
         "--seeds",

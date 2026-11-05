@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import os
 
 CSV_PATH = "tabelas/resumo_geral_todos_csvs.csv"
-OUT_PATH = "figs_resultados/fig_sucesso_medio_pure_pirl.pdf"
+OUT_PATH = "figs/figs_resultados/fig_sucesso_medio_pure_pirl.pdf"
 os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
 df = pd.read_csv(CSV_PATH)
 # Normaliza modo
@@ -31,7 +31,7 @@ print(f"Figura salva em: {OUT_PATH}")
 
 
 CSV_PATH = "tabelas/resumo_geral_todos_csvs.csv"
-OUT_PATH = "figs_resultados/fig_torque_energia_medio_pure_pirl.pdf"
+OUT_PATH = "figs/figs_resultados/fig_torque_energia_medio_pure_pirl.pdf"
 os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
 df = pd.read_csv(CSV_PATH)
 df["mode_norm"] = (
@@ -64,7 +64,7 @@ print(f"Figura salva em: {OUT_PATH}")
 
 
 CSV_PATH = "tabelas/safety_metrics.csv"
-OUT_PATH = "figs_resultados/fig_sucesso_vs_sucesso_seguro_pure_pirl.pdf"
+OUT_PATH = "figs/figs_resultados/fig_sucesso_vs_sucesso_seguro_pure_pirl.pdf"
 os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
 df = pd.read_csv(CSV_PATH)
 df["mode_norm"] = (

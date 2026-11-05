@@ -20,7 +20,7 @@ no intervalo de seeds escolhido:
 
 Uso típico (seeds 1 a 10):
 
-    python scripts_graficos/script_safety_metrics.py --first-seed 1 --last-seed 10
+    python scripts/graficos/script_safety_metrics.py --first-seed 1 --last-seed 10
 
 Gera uma tabela CSV em tabelas/safety_metrics.csv com uma linha por modo.
 """

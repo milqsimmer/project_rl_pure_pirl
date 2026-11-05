@@ -7,7 +7,7 @@ from gym.wrappers import TimeLimit
 from stable_baselines3 import PPO
 
 from two_link_arm_env import TwoLinkArmEnv
-from plot_arm_from_env import plot_arm
+from scripts.graficos.plot_arm_from_env import plot_arm
 
 
 def get_run_dir(mode: str, seed: int, run_tag: str = "") -> str:
@@ -52,9 +52,7 @@ def parse_args() -> argparse.Namespace:
         "--episodes",
         type=int,
         default=0,
-        help=(
-            "Número de episódios a rodar (0 = loop infinito até fechar a janela)."
-        ),
+        help=("Número de episódios a rodar (0 = loop infinito até fechar a janela)."),
     )
     ap.add_argument(
         "--pause-between-episodes",

@@ -71,7 +71,7 @@ def main() -> None:
     # 1) Graficos de comparacao pure vs pirl por seed a partir dos JSON de eval
     cmd_eval_plots = [
         py,
-        "plot_eval_compare.py",
+        "scripts/graficos/plot_eval_compare.py",
         "--first-seed",
         str(args.first_seed),
         "--last-seed",
@@ -89,7 +89,7 @@ def main() -> None:
             out_prefix_scales = f"results/analyze_scales_seed{seed}"
             cmd_scales = [
                 py,
-                "analyze_scales.py",
+                "scripts/analyze_scales.py",
                 "--mode",
                 "both",
                 "--policy",

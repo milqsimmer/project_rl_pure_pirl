@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-OUT_DIR = "figs_treino"
+OUT_DIR = "figs/figs_treino"
 os.makedirs(OUT_DIR, exist_ok=True)
 
 LABELS = {

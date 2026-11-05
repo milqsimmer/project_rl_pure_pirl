@@ -31,32 +31,24 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 ├── two_link_arm_env.py       # Ambiente Gym customizado para o braço 2-DOF
 ├── train_rl.py               # Script de treino PPO (modes: pure, pirl)
 ├── eval_rl.py                # Script de avaliação dos modelos treinados
-├── analyze_scales.py         # Analisa escalas típicas de dist/ação/torque/energia
-├── inspect_episodes.py       # Inspeção detalhada de episódios e CSVs representativos
-├── run_experiments_seeds.py  # Pipeline legado de treino+avaliação para várias seeds
-├── run_train_target_seeds.py # Helper: treino pure/pirl com seed = target_seed
-├── run_eval_target_seeds.py  # Helper: eval usando pares (model_seed, target_seed)
-├── plot_train_compare.py     # Gráficos de treino (reward + sucesso, sucesso por seed)
-├── plot_eval_compare.py      # Gráficos de eval (pure vs pirl por seed)
-├── run_plots_train.py        # Gera todos os plots de treino a partir dos monitor.csv
-├── run_plots_eval_all.py     # Gera todos os plots de eval (e opcionalmente escalas)
-├── run_plots_results_paper.py# Pipeline de figuras/tabelas para a dissertação
-├── plot_arm_from_env.py      # Gera figura 2D estilizada do manipulador
-├── scripts_test/
-│   ├── demo_inicial.py       # Demo inicial em PyBullet (sem Gym/RL)
-│   ├── test_env.py           # Teste de IK + TwoLinkArmEnv (distância ponta–alvo)
-│   ├── test_tip_visual.py    # Debug visual da ponta/alvo com overlays
-│   └── sanity_check.py       # Sanidade de Gym + NumPy
-├── scripts_graficos/         # Scripts extras para gráficos/tabelas (PDFs/LaTeX)
-├── figs_env/                 # Figuras do ambiente (layout, espaço de trabalho, etc.)
-├── figs_resultados/          # Gráficos/resultados de avaliação
-├── figs_treino/              # Curvas de treino agregadas (script_plot_train)
+├── watch_arm.py / watch_train.py  # Helpers interativos de visualização
+├── scripts/                  # (rodar sempre a partir da raiz do projeto)
+│   ├── analyze_scales.py     # Analisa escalas típicas de dist/ação/torque/energia
+│   ├── inspect_episodes.py   # Inspeção detalhada de episódios e CSVs representativos
+│   ├── runs/                 # Orquestração de treino/avaliação
+│   │   ├── run_experiments_seeds.py   # Pipeline legado de treino+avaliação para várias seeds
+│   │   ├── run_train_target_seeds.py  # Treino pure/pirl com seed = target_seed
+│   │   └── run_eval_target_seeds.py   # Eval usando pares (model_seed, target_seed)
+│   ├── graficos/             # Gráficos/tabelas (plot_*, run_plots_*, script_*)
+│   └── scripts_test/         # demo_inicial, test_env, test_tip_visual, sanity_check
+├── figs/                     # figs_env, figs_resultados, figs_treino, figs_episodios_inspecao
+├── tabelas/                  # Tabelas CSV agregadas
+├── docs/                     # Notas de experimentos, plano, requirements legado
 ├── runs_pure/                # Saídas de treino PPO (modo "pure")
 ├── runs_pirl/                # Saídas de treino PPO (modo "pirl")
 ├── results/                  # CSVs/JSONs de avaliação gerados por eval_rl.py
 ├── two_link_arm.urdf         # Modelo URDF do braço
 ├── requirements.txt          # Dependências do projeto
-├── requirements_legacy.txt   # Versão alternativa de dependências (legado)
 ├── AGENTS.md                 # Guia para agentes de código
 └── README.md                 # Este arquivo
 ```
@@ -76,21 +68,21 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 
 2. Simulação / demonstração inicial (PyBullet puro, sem Gym/RL):
    ```bash
-   python scripts_test/demo_inicial.py
+   python scripts/scripts_test/demo_inicial.py
    ```
 
 3. Testes rápidos e debug do ambiente:
    - Sanidade de Gym + NumPy:
      ```bash
-     python scripts_test/sanity_check.py
+     python scripts/scripts_test/sanity_check.py
      ```
    - Teste de IK + ambiente (vários alvos aleatórios):
      ```bash
-     python scripts_test/test_env.py
+     python scripts/scripts_test/test_env.py
      ```
    - Debug visual da ponta e do alvo (overlays na GUI do PyBullet):
      ```bash
-     python scripts_test/test_tip_visual.py
+     python scripts/scripts_test/test_tip_visual.py
      ```
 
 ## 🧠 Requisitos
@@ -187,7 +179,7 @@ Para reproduzir um conjunto de experimentos de treino+avaliação para várias s
 Opção legado (simples):
 
 ```bash
-python run_experiments_seeds.py --first-seed 0 --last-seed 4 \
+python scripts/runs/run_experiments_seeds.py --first-seed 0 --last-seed 4 \
     --steps 300000 --episodes 200
 ```
 
@@ -195,10 +187,10 @@ Opção recomendada (usando `target_seed` = `seed`):
 
 ```bash
 # Treino pure + pirl para seeds 0..4
-python run_train_target_seeds.py --first-seed 0 --last-seed 4 --steps 2000000
+python scripts/runs/run_train_target_seeds.py --first-seed 0 --last-seed 4 --steps 2000000
 
 # Avaliação pure+pirl (usa os mesmos modelos e target_seeds)
-python run_eval_target_seeds.py --mode both --model-first-seed 0 --model-last-seed 4
+python scripts/runs/run_eval_target_seeds.py --mode both --model-first-seed 0 --model-last-seed 4
 ```
 
 
@@ -206,23 +198,23 @@ python run_eval_target_seeds.py --mode both --model-first-seed 0 --model-last-se
 
 - Escalas típicas de distância/ação/torque/energia:
   ```bash
-  python analyze_scales.py --mode both --policy trained --seed 0 \
+  python scripts/analyze_scales.py --mode both --policy trained --seed 0 \
       --episodes 50 --max-steps 200
   ```
 
 - Inspeção detalhada de episódios representativos (baixa/alta energia,
   sucesso/fracasso) e geração de CSVs passo a passo:
   ```bash
-  python inspect_episodes.py --mode both --first-seed 0 --last-seed 4 \
+  python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 4 \
       --episodes-per-config 20 --max-steps 200
   ```
 
   - Geração de gráficos e tabelas agregadas (sucesso, distância, esforço, energia)
   a partir dos CSVs de avaliação oficial:
   ```bash
-  python run_plots_train.py --first-seed 0 --last-seed 4
-  python run_plots_eval_all.py --first-seed 0 --last-seed 4
-  python run_plots_results_paper.py --first-seed 0 --last-seed 4 --include-inspected
+  python scripts/graficos/run_plots_train.py --first-seed 0 --last-seed 4
+  python scripts/graficos/run_plots_eval_all.py --first-seed 0 --last-seed 4
+  python scripts/graficos/run_plots_results_paper.py --first-seed 0 --last-seed 4 --include-inspected
   ```
 
 
@@ -240,13 +232,13 @@ python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 \
     --out results/eval_official_seed0
 
 # 3) Análises de escalas e episódios representativos
-python analyze_scales.py --mode both --policy trained --seed 0 \
+python scripts/analyze_scales.py --mode both --policy trained --seed 0 \
     --episodes 50 --max-steps 200
-python inspect_episodes.py --mode both --first-seed 0 --last-seed 0 \
+python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 0 \
     --episodes-per-config 20 --max-steps 200
 
 # 4) Geração de gráficos e tabelas agregadas
-python run_plots_results_paper.py --first-seed 0 --last-seed 0 --include-inspected
+python scripts/graficos/run_plots_results_paper.py --first-seed 0 --last-seed 0 --include-inspected
 ```
 
 

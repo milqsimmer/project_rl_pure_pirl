@@ -9,7 +9,7 @@ CSV_GLOBS = [
     r"results/eval_official_seed*_*.csv",
     r"results/eval_model*_target*_mode*_*.csv",
 ]
-OUT_DIR = "figs_resultados"
+OUT_DIR = "figs/figs_resultados"
 TABELAS_DIR = "tabelas"
 
 LABELS = {

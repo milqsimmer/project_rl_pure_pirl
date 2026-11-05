@@ -8,8 +8,8 @@ import pandas as pd
 
 
 INSPECT_DIR = "results/episodios_inspecao"
-OUT_DIR_SINGLE = "figs_episodios_inspecao/single"
-OUT_DIR_PAIRED = "figs_episodios_inspecao/paired"
+OUT_DIR_SINGLE = "figs/figs_episodios_inspecao/single"
+OUT_DIR_PAIRED = "figs/figs_episodios_inspecao/paired"
 
 LABELS = {
     "pure": "RL puro",

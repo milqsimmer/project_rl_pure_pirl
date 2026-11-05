@@ -15,7 +15,7 @@ CSV_GLOBS = [
     r"results/eval_official_seed*_*.csv",
     r"results/eval_model*_target*_mode*_*.csv",
 ]
-OUT_DIR = r"figs_resultados"
+OUT_DIR = r"figs/figs_resultados"
 TABELAS_DIR = r"tabelas"
 
 # ========= LABELS =========

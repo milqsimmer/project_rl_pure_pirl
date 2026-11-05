@@ -57,7 +57,7 @@ def main() -> None:
     # 1) Graficos completos (reward + sucesso) para pure e pirl
     cmd_full = [
         py,
-        "plot_train_compare.py",
+        "scripts/graficos/plot_train_compare.py",
         "--mode",
         "both",
         "--seeds",
@@ -68,7 +68,7 @@ def main() -> None:
     # 2) Graficos de sucesso por seed (um subplot por seed)
     cmd_success = [
         py,
-        "plot_train_compare.py",
+        "scripts/graficos/plot_train_compare.py",
         "--mode",
         "both",
         "--seeds",
@@ -82,7 +82,7 @@ def main() -> None:
 
     cmd_full_cut = [
         py,
-        "plot_train_compare.py",
+        "scripts/graficos/plot_train_compare.py",
         "--mode",
         "both",
         "--seeds",
@@ -96,7 +96,7 @@ def main() -> None:
 
     cmd_success_cut = [
         py,
-        "plot_train_compare.py",
+        "scripts/graficos/plot_train_compare.py",
         "--mode",
         "both",
         "--seeds",
@@ -114,7 +114,7 @@ def main() -> None:
         out_prefix_scales = f"results/analyze_scales_seed{seed}"
         cmd_scales = [
             py,
-            "analyze_scales.py",
+            "scripts/analyze_scales.py",
             "--mode",
             "both",
             "--policy",
@@ -128,7 +128,7 @@ def main() -> None:
 
     # 5) Figura esquematica do braco a partir do env (opcional, roda uma vez)
     try:
-        run_cmd([py, "plot_arm_from_env.py"])
+        run_cmd([py, "scripts/graficos/plot_arm_from_env.py"])
     except SystemExit:
         # se faltar URDF ou algo semelhante, nao interrompe o restante
         print("[run_plots_all] plot_arm_from_env.py falhou; seguindo em frente.")
