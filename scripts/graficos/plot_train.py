@@ -1,7 +1,8 @@
 """Gráficos de treino a partir dos monitor.csv do Stable-Baselines3.
 
 Executar a partir da raiz do projeto. Lê
-runs/runs_<mode>/seed_<seed>_<tag>/monitor.csv (convenção de train_rl.py) e gera, em --out-dir (default figs/figs_treino):
+runs/runs_<mode>/seed_<seed>_<tag>/monitor.csv (convenção de train_rl.py) e gera,
+em --out-dir (default figs/figs_treino):
 
   agregado (--figures aggregate)  PDF, média ± desvio entre seeds, pure x pirl
       fig_treino_reward.pdf, fig_treino_sucesso.pdf, fig_treino_distancia_final.pdf
