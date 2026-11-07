@@ -68,6 +68,12 @@ def main() -> None:
         help="Limite de passos por episodio (TimeLimit).",
     )
     parser.add_argument(
+        "--out-dir",
+        type=str,
+        default="results",
+        help="Pasta onde gravar os CSV/JSON de avaliacao (ex.: results/md02).",
+    )
+    parser.add_argument(
         "--python-exe",
         type=str,
         default=sys.executable,
@@ -87,7 +93,7 @@ def main() -> None:
         help=(
             "Modulo maximo da variacao de angulo por passo (acao) em radianos "
             "durante a avaliacao. Deve coincidir com o valor usado no treino; "
-            "default=0.2 (config atual do pure forte).",
+            "default=0.2 (config atual do pure forte)."
         ),
     )
     parser.add_argument(
@@ -96,7 +102,7 @@ def main() -> None:
         default=5.0,
         help=(
             "Bonus adicional somado ao reward no passo de sucesso durante o eval "
-            "(mantido igual ao treino na configuracao atual).",
+            "(mantido igual ao treino na configuracao atual)."
         ),
     )
 
@@ -140,7 +146,7 @@ def main() -> None:
         print("=" * 80)
 
         out_prefix = (
-            f"results/eval_model{model_seed}_target{target_seed}_mode{args.mode}"
+            f"{args.out_dir}/eval_model{model_seed}_target{target_seed}_mode{args.mode}"
         )
 
         cmd_eval = [

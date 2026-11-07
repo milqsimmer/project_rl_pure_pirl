@@ -303,7 +303,7 @@ interfaces. New agents should prefer the newer helpers when possible.
     mean±std PDFs, per-seed comparison and success-per-seed figures
     (`--figures aggregate,compare,per-seed`).
   - `scripts/graficos/plot_eval.py`: reads the per-episode eval CSVs
-    (`results/eval_model*_target*_mode*_*.csv`), writes the summary tables
+    (`results/md02/eval_model*_target*_mode*_*.csv`, see `--results-dir`), writes the summary tables
     (`tabelas/resumo_geral_todos_csvs.csv`, `resumo_por_seed.csv`,
     `target_distance_success.csv`) and the pure vs pirl figures (boxplots,
     per-seed bars, mean±std summaries, energy x success trade-off, success vs

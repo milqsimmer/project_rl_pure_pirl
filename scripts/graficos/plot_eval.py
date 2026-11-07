@@ -2,8 +2,9 @@
 
 Executar a partir da raiz do projeto. Lê, por episódio:
 
-    results/eval_model<seed>_target<seed>_mode{pure,pirl}_<seed>.csv
-    (e o formato legado results/eval_official_seed<seed>_<seed>.csv)
+    <results-dir>/eval_model<seed>_target<seed>_mode{pure,pirl}_<seed>.csv
+    (e o formato legado <results-dir>/eval_official_seed<seed>_<seed>.csv)
+    com --results-dir (default results/md02).
 
 Tabelas (--tables-dir, default tabelas/):
     resumo_geral_todos_csvs.csv   métricas agregadas por modo (todos os episódios)
@@ -40,9 +41,9 @@ import pandas as pd
 MODES = ["pure", "pirl"]
 LABELS = {"pure": "RL puro", "pirl": "PIRL (PI-reward)"}
 
-CSV_GLOBS = [
-    "results/eval_official_seed*_*.csv",
-    "results/eval_model*_target*_mode*_*.csv",
+CSV_PATTERNS = [
+    "eval_official_seed*_*.csv",
+    "eval_model*_target*_mode*_*.csv",
 ]
 
 REQUIRED_COLS = ["mode", "episode", "success", "final_distance", "return", "length"]
@@ -98,9 +99,12 @@ def normalize_mode(value) -> str:
     return v
 
 
-def load_eval_data(first_seed: int, last_seed: int) -> tuple[pd.DataFrame, list[str]]:
+def load_eval_data(
+    first_seed: int, last_seed: int, results_dir: str
+) -> tuple[pd.DataFrame, list[str]]:
     """Lê os CSVs de eval das seeds [first_seed, last_seed] em um único DataFrame."""
-    paths = sorted({p for pat in CSV_GLOBS for p in glob.glob(pat)})
+    globs = [os.path.join(results_dir, pat) for pat in CSV_PATTERNS]
+    paths = sorted({p for pat in globs for p in glob.glob(pat)})
     dfs, used = [], []
     for path in paths:
         seed = extract_seed_from_filename(path)
@@ -114,7 +118,7 @@ def load_eval_data(first_seed: int, last_seed: int) -> tuple[pd.DataFrame, list[
     if not dfs:
         raise SystemExit(
             f"Nenhum CSV de eval para as seeds {first_seed}-{last_seed} "
-            f"({', '.join(CSV_GLOBS)})."
+            f"({', '.join(globs)})."
         )
 
     df = pd.concat(dfs, ignore_index=True)
@@ -427,6 +431,8 @@ def parse_args() -> argparse.Namespace:
         "--figures", default="all",
         help=f"'all' ou lista separada por vírgula de: {', '.join(FIGURES)}.",
     )
+    ap.add_argument("--results-dir", default="results/md02",
+                    help="Pasta com os CSVs de avaliação (eval_rl.py).")
     ap.add_argument("--out-dir", default="figs/figs_resultados")
     ap.add_argument("--tables-dir", default="tabelas")
     return ap.parse_args()
@@ -447,7 +453,7 @@ def main() -> None:
     os.makedirs(args.out_dir, exist_ok=True)
     os.makedirs(args.tables_dir, exist_ok=True)
 
-    df, used = load_eval_data(args.first_seed, args.last_seed)
+    df, used = load_eval_data(args.first_seed, args.last_seed, args.results_dir)
     print(f"[plot_eval] {len(used)} CSVs lidos (seeds {args.first_seed}-{args.last_seed}).")
 
     general = build_general_summary(df)

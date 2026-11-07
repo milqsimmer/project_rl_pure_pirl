@@ -55,7 +55,7 @@ que levou à configuração `md02`.
 
 ## Como se relaciona com o resto
 
-- Resultados atuais (md02, seeds 1 a 10): `results/eval_model<seed>_target<seed>_mode{pure,pirl}_<seed>.csv`,
+- Resultados atuais (md02, seeds 1 a 10): `results/md02/eval_model<seed>_target<seed>_mode{pure,pirl}_<seed>.csv`,
   lidos por `scripts/graficos/plot_eval.py`.
 - Os modelos desta fase estavam em `runs_pure/seed_<s>_at2e4/` e
   `runs_pirl/seed_<s>_at2e4/` (com `monitor.csv`, `ppo_model_<s>.zip` e

@@ -178,8 +178,9 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
     - `<out>_<seed>.csv` (métricas por episódio), `<out>_<seed>_summary.json` (resumo
       agregado) e `<out>_<seed>_cmd.txt` (comando usado).
     - Com `scripts/runs/run_eval_target_seeds.py` os arquivos saem como
-      `results/eval_model<seed>_target<seed>_mode<pure|pirl>_<seed>.csv`, padrão lido
-      por `scripts/graficos/plot_eval.py`.
+      `<out-dir>/eval_model<seed>_target<seed>_mode<pure|pirl>_<seed>.csv` (`--out-dir`,
+      default `results`); o `scripts/graficos/plot_eval.py` lê esse padrão de
+      `--results-dir` (default `results/md02`, onde estão as avaliações oficiais md02).
 
 
 ## 🔁 Experimentos com várias seeds

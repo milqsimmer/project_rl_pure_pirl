@@ -27,7 +27,7 @@ cerca de 25% em relação ao pure. Com `3e-4` e `5e-4` o sucesso cai e o esforç
 não melhora de forma consistente.
 
 O `eval_seed0_md02_at2e4_0` é também a avaliação do pirl oficial da seed 0; as
-seeds 1 a 10 do pirl oficial estão em `results/eval_model<seed>_target<seed>_modepirl_<seed>.*`.
+seeds 1 a 10 do pirl oficial estão em `results/md02/eval_model<seed>_target<seed>_modepirl_<seed>.*`.
 
 ## Arquivo sem resultado
 

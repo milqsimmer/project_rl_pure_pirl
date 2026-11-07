@@ -44,7 +44,7 @@ def main() -> None:
         default=0.0002,
         help=(
             "Peso alpha_tau da penalidade de torque no modo pirl (default: 2e-4), "
-            "alinhado com a configuracao atual.",
+            "alinhado com a configuracao atual."
         ),
     )
     parser.add_argument(
