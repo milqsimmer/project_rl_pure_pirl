@@ -10,19 +10,16 @@ Tabelas (--tables-dir, default tabelas/):
     resumo_geral_todos_csvs.csv   métricas agregadas por modo (todos os episódios)
     resumo_por_seed.csv           métricas médias por (seed, modo)
     target_distance_success.csv   sucesso por faixa de distância inicial ponta-alvo
+    limites_movimento.csv         limites articulares, velocidade, torque e jerk
+                                  (média ± dp entre seeds; requer colunas do eval_rl.py atual)
 
 Figuras (--out-dir, default figs/figs_resultados/), escolhidas com --figures:
-    boxplot        fig1_boxplot_combined.pdf          boxplot por seed (sucesso, distância)
-    per-seed       fig2_performance_seed.pdf          sucesso/distância por seed
-    summary        fig3_resumo_barras.pdf             barras média±dp (sucesso, dist, torque, energia)
-    tradeoff       fig4_tradeoff_energia_sucesso.pdf  energia x sucesso, um ponto por seed
-    summary-task   fig5_resumo_sucesso_distancia.pdf  subconjunto da fig3 (tarefa)
-    summary-effort fig6_resumo_torque_energia.pdf     subconjunto da fig3 (esforço)
-    mean-success   fig_sucesso_medio_pure_pirl.pdf    sucesso médio (todos os episódios)
-    mean-effort    fig_torque_energia_medio_pure_pirl.pdf
-    target-distance fig_target_distance_success.pdf   sucesso x distância inicial
-    seed-bars      fig_per_seed_{success_rate,final_dist,tau_effort,energy}.pdf
-                   e fig_per_seed_grid.pdf            barras pure x pirl por seed
+    boxplot         fig1_boxplot_combined.pdf          boxplot por seed (sucesso, distância)
+    summary         fig3_resumo_barras.pdf             barras média±dp entre seeds (sucesso, dist, torque, energia)
+    tradeoff        fig4_tradeoff_energia_sucesso.pdf  energia x sucesso, um ponto por seed
+    seed-grid       fig_per_seed_grid.pdf              barras pure x pirl por seed, 4 métricas
+    target-distance fig_target_distance_success.pdf    sucesso x distância inicial ponta-alvo
+    motion          fig_limites_movimento.pdf          saturação de torque, velocidade/limite articular, jerk
 
 Exemplos:
     python scripts/graficos/plot_eval.py                       # seeds 1-10, tudo
@@ -100,21 +97,39 @@ def normalize_mode(value) -> str:
 
 
 def load_eval_data(
-    first_seed: int, last_seed: int, results_dir: str
+    first_seed: int,
+    last_seed: int,
+    results_dir: str,
+    pure_dir: str | None = None,
+    pirl_dir: str | None = None,
 ) -> tuple[pd.DataFrame, list[str]]:
-    """Lê os CSVs de eval das seeds [first_seed, last_seed] em um único DataFrame."""
-    globs = [os.path.join(results_dir, pat) for pat in CSV_PATTERNS]
-    paths = sorted({p for pat in globs for p in glob.glob(pat)})
-    dfs, used = [], []
-    for path in paths:
-        seed = extract_seed_from_filename(path)
-        if not first_seed <= seed <= last_seed:
-            continue
-        df = read_csv_auto(path)
-        df["seed"] = seed
-        df["source_file"] = os.path.basename(path)
-        dfs.append(df)
-        used.append(path)
+    """Lê os CSVs de eval das seeds [first_seed, last_seed] em um único DataFrame.
+
+    Por padrão pure e pirl vêm de results_dir. Com pure_dir e/ou pirl_dir, as
+    linhas de cada modo são lidas da pasta indicada (para comparar, por exemplo,
+    o pure de uma pasta com o pirl de outra).
+    """
+    sources = [(pure_dir or results_dir, "pure"), (pirl_dir or results_dir, "pirl")]
+    if (pure_dir or results_dir) == (pirl_dir or results_dir):
+        sources = [(results_dir if not pure_dir else pure_dir, None)]
+
+    dfs, used, globs = [], [], []
+    for folder, only_mode in sources:
+        patterns = [os.path.join(folder, pat) for pat in CSV_PATTERNS]
+        globs.extend(patterns)
+        for path in sorted({p for pat in patterns for p in glob.glob(pat)}):
+            seed = extract_seed_from_filename(path)
+            if not first_seed <= seed <= last_seed:
+                continue
+            df = read_csv_auto(path)
+            if only_mode is not None:
+                df = df[df["mode"].apply(normalize_mode) == only_mode]
+                if df.empty:
+                    continue
+            df["seed"] = seed
+            df["source_file"] = os.path.basename(path)
+            dfs.append(df)
+            used.append(path)
     if not dfs:
         raise SystemExit(
             f"Nenhum CSV de eval para as seeds {first_seed}-{last_seed} "
@@ -204,6 +219,39 @@ def build_target_distance_table(df: pd.DataFrame) -> pd.DataFrame | None:
     return grp
 
 
+# métricas de limites/velocidade/torque/suavidade (colunas de eval_rl.py):
+# (coluna, rótulo do eixo, ylim)
+MOTION_METRICS = [
+    ("tau_sat_rate", "Passos com torque saturado (fração)", None),
+    ("omega_near_rate", "Passos com |ω| ≥ 90% do limite (fração)", None),
+    ("theta_near_limit_rate", "Passos perto do limite articular (fração)", None),
+    ("cmd_over_limit_rate", "Passos com comando além do limite (fração)", None),
+    ("jerk_rms", "Jerk RMS (rad/s³)", None),
+    ("action_delta_mean", "Variação média da ação ‖Δa‖", None),
+]
+# colunas só da tabela (picos quase constantes, pouco informativos em gráfico)
+MOTION_TABLE_ONLY = ["peak_tau", "peak_omega", "peak_abs_theta", "omega_over_rate"]
+
+
+def build_motion_table(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame] | None:
+    """Médias por seed e, sobre as seeds, média ± desvio por modo."""
+    cols = [c for c, _, _ in MOTION_METRICS] + MOTION_TABLE_ONLY
+    missing = [c for c in cols if c not in df.columns]
+    if missing:
+        print(f"[plot_eval] Colunas {missing} ausentes (reavalie com o eval_rl.py "
+              "atual); motion ignorado.")
+        return None
+    per_seed = df.groupby(["seed", "mode_norm"], as_index=False)[cols].mean()
+    rows = []
+    for mode in MODES:
+        sub = per_seed[per_seed["mode_norm"] == mode]
+        row = {"mode": LABELS[mode], "n_seeds": len(sub)}
+        for c in cols:
+            row[f"{c}_mean"], row[f"{c}_std"] = _mean_std(sub[c])
+        rows.append(row)
+    return pd.DataFrame(rows), per_seed
+
+
 # ========= HELPERS DE PLOT =========
 def save_fig(fig: plt.Figure, out_dir: str, fname: str) -> None:
     path = os.path.join(out_dir, fname)
@@ -211,11 +259,6 @@ def save_fig(fig: plt.Figure, out_dir: str, fname: str) -> None:
     fig.savefig(path, format="pdf", bbox_inches="tight")
     plt.close(fig)
     print(f"[plot_eval] Figura salva em: {path}")
-
-
-def seeds_text(seed_summary: pd.DataFrame) -> str:
-    seeds = seed_summary["seed"]
-    return f"seeds {int(seeds.min())}–{int(seeds.max())}"
 
 
 def seed_values(seed_summary: pd.DataFrame, mode: str, col: str) -> np.ndarray:
@@ -250,51 +293,28 @@ def fig_boxplot(seed_summary, out_dir, **_) -> None:
     save_fig(fig, out_dir, "fig1_boxplot_combined.pdf")
 
 
-def fig_per_seed(seed_summary, out_dir, **_) -> None:
-    fig, axes = plt.subplots(1, 2)
-    for ax, (col, ylabel, ylim) in zip(axes, (M_SUCCESS, M_DIST)):
-        pivot = seed_summary.pivot(index="seed", columns="mode_norm", values=col)
-        for mode in MODES:
-            ax.plot(pivot.index, pivot[mode], marker="o", label=LABELS[mode])
-        ax.set_xlabel("Seed")
-        ax.set_ylabel(ylabel)
-        if ylim:
-            ax.set_ylim(*ylim)
-        ax.legend()
-    save_fig(fig, out_dir, "fig2_performance_seed.pdf")
-
-
-def fig_seed_bars(seed_summary, out_dir, **_) -> None:
-    """Barras pure x pirl por seed, uma figura por métrica + grid 2x2."""
+def fig_seed_grid(seed_summary, out_dir, **_) -> None:
+    """Grid 2x2 com barras pure x pirl por seed (sucesso, distância, torque, energia)."""
     metrics = available_metrics(seed_summary, [M_SUCCESS, M_DIST, M_TAU, M_ENERGY])
-    names = {"success_rate": "success_rate", "final_distance": "final_dist",
-             "tau_effort": "tau_effort", "energy": "energy"}
+    if len(metrics) < 4:
+        print("[plot_eval] Sem torque/energia; seed-grid ignorado.")
+        return
     seeds = sorted(seed_summary["seed"].unique())
     x, width = np.arange(len(seeds)), 0.4
 
-    def draw(ax, col, ylabel, ylim):
+    fig, axes = plt.subplots(2, 2, figsize=(10, 6), sharex=True)
+    for ax, (col, ylabel, ylim) in zip(axes.ravel(), metrics):
         for off, mode in ((-width / 2, "pure"), (width / 2, "pirl")):
             sub = seed_summary[seed_summary["mode_norm"] == mode].set_index("seed")[col]
-            ax.bar(x + off, [sub.get(s, np.nan) for s in seeds], width, label=LABELS[mode])
+            ax.bar(x + off, [sub.get(sd, np.nan) for sd in seeds], width, label=LABELS[mode])
         ax.set_xticks(x)
-        ax.set_xticklabels([str(s) for s in seeds])
+        ax.set_xticklabels([str(sd) for sd in seeds])
         ax.set_xlabel("Seed (modelo)")
         ax.set_ylabel(ylabel)
         if ylim:
             ax.set_ylim(*ylim)
         ax.legend(loc="best")
-
-    for col, ylabel, ylim in metrics:
-        fig, ax = plt.subplots(figsize=(8, 4))
-        draw(ax, col, ylabel, ylim)
-        ax.set_title(f"{ylabel} por seed")
-        save_fig(fig, out_dir, f"fig_per_seed_{names[col]}.pdf")
-
-    if len(metrics) == 4:
-        fig, axes = plt.subplots(2, 2, figsize=(10, 6), sharex=True)
-        for ax, (col, ylabel, ylim) in zip(axes.ravel(), metrics):
-            draw(ax, col, ylabel, ylim)
-        save_fig(fig, out_dir, "fig_per_seed_grid.pdf")
+    save_fig(fig, out_dir, "fig_per_seed_grid.pdf")
 
 
 # ========= FIGURAS: resumo entre seeds (média ± dp) =========
@@ -305,23 +325,6 @@ def fig_summary(seed_summary, out_dir, **_) -> None:
     for ax, metric in zip(np.atleast_1d(axes).flatten(), metrics):
         draw_mean_std_bars(ax, seed_summary, metric)
     save_fig(fig, out_dir, "fig3_resumo_barras.pdf")
-
-
-def fig_summary_task(seed_summary, out_dir, **_) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-    for ax, metric in zip(axes, (M_SUCCESS, M_DIST)):
-        draw_mean_std_bars(ax, seed_summary, metric)
-    save_fig(fig, out_dir, "fig5_resumo_sucesso_distancia.pdf")
-
-
-def fig_summary_effort(seed_summary, out_dir, **_) -> None:
-    if len(available_metrics(seed_summary, [M_TAU, M_ENERGY])) < 2:
-        print("[plot_eval] Sem torque/energia; summary-effort ignorado.")
-        return
-    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
-    for ax, metric in zip(axes, (M_TAU, M_ENERGY)):
-        draw_mean_std_bars(ax, seed_summary, metric)
-    save_fig(fig, out_dir, "fig6_resumo_torque_energia.pdf")
 
 
 def fig_tradeoff(seed_summary, out_dir, **_) -> None:
@@ -343,45 +346,6 @@ def fig_tradeoff(seed_summary, out_dir, **_) -> None:
     save_fig(fig, out_dir, "fig4_tradeoff_energia_sucesso.pdf")
 
 
-# ========= FIGURAS: resumo sobre todos os episódios =========
-def _general_value(general: pd.DataFrame, mode: str, col: str) -> float:
-    row = general[general["mode"] == LABELS[mode]]
-    return float(row[col].iloc[0])
-
-
-def fig_mean_success(general, seed_summary, out_dir, **_) -> None:
-    vals = [_general_value(general, m, "success_rate_mean") for m in MODES]
-    x = [0, 1]
-    fig, ax = plt.subplots(figsize=(4, 4))
-    ax.bar(x, vals, color=["C0", "C1"])
-    ax.set_xticks(x)
-    ax.set_xticklabels([LABELS[m] for m in MODES])
-    ax.set_ylabel("Taxa de sucesso média")
-    ax.set_ylim(0.0, 1.0)
-    ax.set_title(f"Taxa de sucesso média ({seeds_text(seed_summary)})")
-    for xi, v in zip(x, vals):
-        ax.text(xi, v + 0.01, f"{v:.2f}", ha="center", va="bottom", fontsize=9)
-    save_fig(fig, out_dir, "fig_sucesso_medio_pure_pirl.pdf")
-
-
-def fig_mean_effort(general, out_dir, **_) -> None:
-    if general["tau_effort_mean"].isna().any():
-        print("[plot_eval] Sem torque/energia; mean-effort ignorado.")
-        return
-    x = [0, 1]
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4))
-    for ax, key, ylabel, title in (
-        (axes[0], "tau_effort_mean", "Esforço médio em torque", "Torque médio por episódio"),
-        (axes[1], "energy_mean", "Energia média", "Energia média por episódio"),
-    ):
-        ax.bar(x, [_general_value(general, m, key) for m in MODES], color=["C0", "C1"])
-        ax.set_xticks(x)
-        ax.set_xticklabels([LABELS[m] for m in MODES])
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
-    save_fig(fig, out_dir, "fig_torque_energia_medio_pure_pirl.pdf")
-
-
 def fig_target_distance(target_table, out_dir, **_) -> None:
     if target_table is None:
         return
@@ -400,17 +364,31 @@ def fig_target_distance(target_table, out_dir, **_) -> None:
     save_fig(fig, out_dir, "fig_target_distance_success.pdf")
 
 
+def fig_motion(motion, out_dir, **_) -> None:
+    """Barras pure x pirl (média ± desvio entre seeds) das métricas de movimento."""
+    if motion is None:
+        return
+    _, per_seed = motion
+    fig, axes = plt.subplots(2, 3, figsize=(13, 7))
+    for ax, (col, ylabel, ylim) in zip(axes.ravel(), MOTION_METRICS):
+        vals = [per_seed[per_seed["mode_norm"] == m][col].values for m in MODES]
+        means = [np.nanmean(v) for v in vals]
+        stds = [np.nanstd(v, ddof=1) for v in vals]
+        ax.bar(np.arange(2), means, yerr=stds, tick_label=[LABELS[m] for m in MODES],
+               capsize=5, color=["C0", "C1"])
+        ax.set_ylabel(ylabel)
+        if ylim:
+            ax.set_ylim(*ylim)
+    save_fig(fig, out_dir, "fig_limites_movimento.pdf")
+
+
 FIGURES = {
     "boxplot": fig_boxplot,
-    "per-seed": fig_per_seed,
     "summary": fig_summary,
     "tradeoff": fig_tradeoff,
-    "summary-task": fig_summary_task,
-    "summary-effort": fig_summary_effort,
-    "mean-success": fig_mean_success,
-    "mean-effort": fig_mean_effort,
+    "seed-grid": fig_seed_grid,
     "target-distance": fig_target_distance,
-    "seed-bars": fig_seed_bars,
+    "motion": fig_motion,
 }
 
 
@@ -433,6 +411,10 @@ def parse_args() -> argparse.Namespace:
     )
     ap.add_argument("--results-dir", default="results/md02",
                     help="Pasta com os CSVs de avaliação (eval_rl.py).")
+    ap.add_argument("--pure-dir", default=None,
+                    help="Pasta dos CSVs do pure (default: --results-dir).")
+    ap.add_argument("--pirl-dir", default=None,
+                    help="Pasta dos CSVs do pirl (default: --results-dir).")
     ap.add_argument("--out-dir", default="figs/figs_resultados")
     ap.add_argument("--tables-dir", default="tabelas")
     return ap.parse_args()
@@ -453,22 +435,28 @@ def main() -> None:
     os.makedirs(args.out_dir, exist_ok=True)
     os.makedirs(args.tables_dir, exist_ok=True)
 
-    df, used = load_eval_data(args.first_seed, args.last_seed, args.results_dir)
+    df, used = load_eval_data(
+        args.first_seed, args.last_seed, args.results_dir, args.pure_dir, args.pirl_dir
+    )
     print(f"[plot_eval] {len(used)} CSVs lidos (seeds {args.first_seed}-{args.last_seed}).")
 
     general = build_general_summary(df)
     seed_summary = build_seed_summary(df)
     target_table = build_target_distance_table(df)
+    motion = build_motion_table(df)
 
     save_table(general, args.tables_dir, "resumo_geral_todos_csvs.csv")
     save_table(seed_summary, args.tables_dir, "resumo_por_seed.csv")
     if target_table is not None:
         save_table(target_table, args.tables_dir, "target_distance_success.csv")
+    if motion is not None:
+        save_table(motion[0], args.tables_dir, "limites_movimento.csv")
 
     ctx = dict(
         general=general,
         seed_summary=seed_summary,
         target_table=target_table,
+        motion=motion,
         out_dir=args.out_dir,
     )
     for name in wanted:

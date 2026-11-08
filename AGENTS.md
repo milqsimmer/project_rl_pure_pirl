@@ -123,7 +123,8 @@ If you want to add formal unit tests, prefer `pytest`, put them under a
 - Detailed per-step inspection and CSV dumps:
 
   ```bash
-  python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 4 \
+  python scripts/inspect_episodes.py --first-seed 1 --last-seed 3 \
+      --pure-tag <tag_pure> --pirl-tag <tag_pirl> \
       --episodes-per-config 20 --max-steps 200
   ```
 
@@ -300,22 +301,24 @@ interfaces. New agents should prefer the newer helpers when possible.
     `target_seeds` (for cross-generalization).
   - `scripts/graficos/plot_train.py`: reads `monitor.csv` files of the runs
     selected with `--pure-tag` / `--pirl-tag` (no default tags) and produces aggregate
-    mean±std PDFs, per-seed comparison and success-per-seed figures
-    (`--figures aggregate,compare,per-seed`).
+    mean±std PDFs (reward, success) and a per-seed curves figure per mode
+    (`--figures aggregate,compare`).
   - `scripts/graficos/plot_eval.py`: reads the per-episode eval CSVs
     (`results/md02/eval_model*_target*_mode*_*.csv`, see `--results-dir`), writes the summary tables
     (`tabelas/resumo_geral_todos_csvs.csv`, `resumo_por_seed.csv`,
-    `target_distance_success.csv`) and the pure vs pirl figures (boxplots,
-    per-seed bars, mean±std summaries, energy x success trade-off, success vs
-    initial tip–target distance). Select with `--figures`.
+    `target_distance_success.csv`) and 5 pure vs pirl figures (`--figures`:
+    `boxplot`, `summary` (mean±std), `tradeoff` (energy x success), `seed-grid`
+    (per-seed bars), `target-distance` (success vs initial tip–target distance)).
   - `watch_train.py` and `watch_arm.py` are interactive helpers for
     monitoring reward/success curves and 2D arm motion during/after
     training; they should not change training behavior.
 
 - Extra plotting / analysis scripts (under `scripts/`):
   - `inspect_episodes.py` + `graficos/script_plot_inspected_episodes.py`:
-    generate detailed CSVs and figures for a few representative
-    episodes (low/high energy successes and a high-energy failure).
+    generate detailed CSVs and paired figures for a few representative
+    episodes (low/high energy successes and a high-energy failure). Pure and
+    pirl run the same episodes with the same target, so each figure compares
+    the two modes on the same task. Run-tags are required (no defaults).
   - `graficos/plot_arm_from_env.py`: draws the 2D arm reaching a sampled
     target and saves the SVG to `figs/figs_env/`.
 

@@ -16,6 +16,89 @@ def get_model_path(mode: str, seed: int, run_tag: str = "") -> str:
     return os.path.join(get_run_dir(mode, seed, run_tag), f"ppo_model_{seed}.zip")
 
 
+# Limites de referencia (valores declarados em two_link_arm.urdf)
+THETA_LIMIT = 3.14  # rad, limite articular
+THETA_MARGIN = 0.2  # rad, "perto do limite" = a um passo de acao (max_delta_theta)
+OMEGA_LIMIT = 5.0  # rad/s, velocity do URDF
+OMEGA_NEAR_FRAC = 0.9  # "perto do limite de velocidade" = >= 90% do limite
+TAU_LIMIT = 20.0  # N.m, effort do URDF / force do motor
+TAU_SAT_FRAC = 0.99  # saturado = >= 99% do torque maximo
+
+MOTION_KEYS = [
+    "peak_tau",
+    "tau_sat_rate",
+    "peak_omega",
+    "omega_near_rate",
+    "omega_over_rate",
+    "peak_abs_theta",
+    "theta_near_limit_rate",
+    "cmd_over_limit_rate",
+    "jerk_rms",
+    "action_delta_mean",
+]
+
+
+def motion_metrics(
+    theta_before: list,
+    theta_after: list,
+    actions: list,
+    tau: list,
+    omega: list,
+    dt: float,
+) -> dict:
+    """Metricas de limites, velocidade, torque e suavidade de um episodio.
+
+    Cada lista tem um item por passo; theta/tau/omega/acoes sao pares (junta 1, 2).
+    - peak_tau / tau_sat_rate: pico de |tau| e fracao de passos com alguma junta
+      em >= TAU_SAT_FRAC * TAU_LIMIT.
+    - peak_omega / omega_near_rate / omega_over_rate: pico de |omega| e fracao de
+      passos com |omega| >= OMEGA_NEAR_FRAC*OMEGA_LIMIT e > OMEGA_LIMIT.
+    - peak_abs_theta / theta_near_limit_rate: pico de |theta| e fracao de passos
+      com |theta| >= THETA_LIMIT - THETA_MARGIN.
+    - cmd_over_limit_rate: fracao de passos em que o alvo comandado
+      (theta_antes + acao) ultrapassa THETA_LIMIT (o Bullet impede de passar).
+    - jerk_rms: raiz da media de jerk^2 (rad/s^3), por diferenca finita de omega
+      (com omega_0 = 0), sobre as duas juntas.
+    - action_delta_mean: media de ||a_t - a_(t-1)||.
+    """
+    n = len(tau)
+    nan = float("nan")
+    if n == 0:
+        return {k: nan for k in MOTION_KEYS}
+
+    th_b = np.abs(np.asarray(theta_before, dtype=float))
+    th_a = np.abs(np.asarray(theta_after, dtype=float))
+    act = np.asarray(actions, dtype=float)
+    ta = np.abs(np.asarray(tau, dtype=float))
+    om = np.asarray(omega, dtype=float)
+
+    tau_max = np.nanmax(ta, axis=1)
+    om_max = np.nanmax(np.abs(om), axis=1)
+    th_max = np.nanmax(th_a, axis=1)
+    cmd = np.abs(np.asarray(theta_before, dtype=float) + act)
+
+    # jerk por diferenca finita de omega (omega antes do 1o passo = 0)
+    om0 = np.vstack([np.zeros((1, 2)), om])
+    acc = np.diff(om0, axis=0) / dt
+    jerk = np.diff(acc, axis=0) / dt
+    jerk_rms = float(np.sqrt(np.nanmean(jerk**2))) if jerk.size else nan
+
+    a_delta = np.linalg.norm(np.diff(act, axis=0), axis=1) if n > 1 else np.array([])
+
+    return {
+        "peak_tau": float(np.nanmax(tau_max)),
+        "tau_sat_rate": float(np.mean(tau_max >= TAU_SAT_FRAC * TAU_LIMIT)),
+        "peak_omega": float(np.nanmax(om_max)),
+        "omega_near_rate": float(np.mean(om_max >= OMEGA_NEAR_FRAC * OMEGA_LIMIT)),
+        "omega_over_rate": float(np.mean(om_max > OMEGA_LIMIT)),
+        "peak_abs_theta": float(np.nanmax(th_max)),
+        "theta_near_limit_rate": float(np.mean(th_max >= THETA_LIMIT - THETA_MARGIN)),
+        "cmd_over_limit_rate": float(np.mean(np.nanmax(cmd, axis=1) > THETA_LIMIT)),
+        "jerk_rms": jerk_rms,
+        "action_delta_mean": float(np.mean(a_delta)) if a_delta.size else nan,
+    }
+
+
 def evaluate(
     mode: str,
     episodes: int = 100,
@@ -65,6 +148,7 @@ def evaluate(
     dists, lens = [], []
     efforts = []  # lista de E_i por episódio
     energies = []  # energia total aproximada por episódio
+    motion = []  # metricas de limites/velocidade/torque/suavidade por episodio
 
     for ep in range(episodes):
         obs = env.reset()
@@ -78,13 +162,22 @@ def evaluate(
         ep_tau_sum = 0.0  # soma_t ||tau_t||_1 no episódio
         ep_energy = 0.0  # soma_t power_t * dt no episódio
         last_info = {}
+        th_before, th_after, acts, taus, omegas = [], [], [], [], []
 
         while not done:
             action, _ = model.predict(obs, deterministic=True)
+            th_before.append([float(obs[0]), float(obs[1])])
             obs, reward, done, info = env.step(action)
             ep_ret += reward
             ep_len += 1
             last_info = info
+
+            th_after.append([float(obs[0]), float(obs[1])])
+            acts.append([float(action[0]), float(action[1])])
+            taus.append([float(info.get("tau1", np.nan)), float(info.get("tau2", np.nan))])
+            omegas.append(
+                [float(info.get("omega1", np.nan)), float(info.get("omega2", np.nan))]
+            )
 
             tau_sum = float(info.get("tau_sum", np.nan))
             if not np.isnan(tau_sum):
@@ -116,10 +209,13 @@ def evaluate(
         else:
             E_i = np.nan
 
+        mm = motion_metrics(th_before, th_after, acts, taus, omegas, dt)
+
         dists.append(final_dist)
         lens.append(ep_len)
         efforts.append(E_i)
         energies.append(ep_energy)
+        motion.append(mm)
 
         if print_episodes:
             print(
@@ -142,6 +238,7 @@ def evaluate(
                 "energy": ep_energy,
                 "target_radius": target_r0,
                 "tip_init_dist": tip_init_dist0,
+                **mm,
             }
         )
 
@@ -162,6 +259,9 @@ def evaluate(
         "mean_energy": float(np.nanmean(energies)),
         "std_energy": float(np.nanstd(energies)),
     }
+    for k in MOTION_KEYS:
+        vals = [m[k] for m in motion]
+        summary[f"mean_{k}"] = float(np.nanmean(vals))
     return summary, ep_rows
 
 
@@ -205,7 +305,7 @@ def save_csv(csv_path: str, rows: list, summaries: list):
         "energy",
         "target_radius",
         "tip_init_dist",
-    ]
+    ] + MOTION_KEYS
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fieldnames)
         w.writeheader()

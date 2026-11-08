@@ -5,11 +5,9 @@ runs/runs_<mode>/seed_<seed>_<tag>/monitor.csv (convenção de train_rl.py) e ge
 em --out-dir (default figs/figs_treino):
 
   agregado (--figures aggregate)  PDF, média ± desvio entre seeds, pure x pirl
-      fig_treino_reward.pdf, fig_treino_sucesso.pdf, fig_treino_distancia_final.pdf
+      fig_treino_reward.pdf, fig_treino_sucesso.pdf
   compare  (--figures compare)    PNG, uma curva por seed, um arquivo por modo
       train_compare_<mode>.png  (retorno + sucesso)
-  por seed (--figures per-seed)   PNG, sucesso com um subplot por seed
-      train_compare_<mode>_success_per_seed.png
 
 O run_tag das runs é obrigatório e não tem padrão: informe --pure-tag e/ou
 --pirl-tag (ou --run-tag, comum aos modos). Use "" para runs sem tag.
@@ -31,7 +29,7 @@ LABELS = {
     "pirl": "PIRL (PI-reward)",
 }
 
-FIGURES = ("aggregate", "compare", "per-seed")
+FIGURES = ("aggregate", "compare")
 
 
 # ========= I/O =========
@@ -81,7 +79,6 @@ def add_moving_averages(df: pd.DataFrame, window: int) -> None:
     for src, dst in (
         ("r", "reward_ma"),
         ("is_success", "success_ma"),
-        ("final_distance", "final_distance_ma"),
     ):
         if src in df.columns:
             df[dst] = df.groupby("seed")[src].transform(
@@ -120,8 +117,6 @@ def plot_aggregate(dfs: dict[str, pd.DataFrame], window: int, out_dir: str) -> N
          "fig_treino_reward.pdf", None),
         ("success_ma", f"Taxa de sucesso (média móvel, janela={window})",
          "fig_treino_sucesso.pdf", (0.0, 1.0)),
-        ("final_distance_ma", f"Distância final (média móvel, janela={window})",
-         "fig_treino_distancia_final.pdf", None),
     ]
     for y_col, ylabel, fname, ylim in specs:
         fig, ax = plt.subplots()
@@ -177,28 +172,6 @@ def plot_compare(mode: str, df: pd.DataFrame, out_dir: str) -> None:
     fig.savefig(path, dpi=300)
     plt.close(fig)
     print(f"[plot_train] Figura salva em: {path}")
-
-
-def plot_per_seed(mode: str, df: pd.DataFrame, out_dir: str) -> None:
-    if df.empty or "success_ma" not in df.columns:
-        print(f"[plot_train] Sem curvas de sucesso para modo {mode}; per-seed não gerado.")
-        return
-    seeds = sorted(df["seed"].unique())
-    fig, axes = plt.subplots(
-        len(seeds), 1, sharex=True, figsize=(8, 2.5 * len(seeds)), squeeze=False
-    )
-    for ax, seed in zip(axes[:, 0], seeds):
-        d = df[df["seed"] == seed]
-        ax.plot(d["timesteps"], d["success_ma"])
-        ax.set_ylabel("Taxa de sucesso")
-        ax.set_ylim(0.0, 1.0)
-        ax.set_title(f"modo={mode} – seed {seed}")
-    axes[-1, 0].set_xlabel("Timesteps de treino")
-    fig.tight_layout()
-    path = os.path.join(out_dir, f"train_compare_{mode}_success_per_seed.png")
-    fig.savefig(path, dpi=300)
-    plt.close(fig)
-    print(f"[plot_train] Figura (sucesso por seed) salva em: {path}")
 
 
 # ========= CLI =========
@@ -270,8 +243,6 @@ def main() -> None:
     for mode in modes:
         if "compare" in figures:
             plot_compare(mode, dfs[mode], args.out_dir)
-        if "per-seed" in figures:
-            plot_per_seed(mode, dfs[mode], args.out_dir)
 
 
 if __name__ == "__main__":

@@ -1,18 +1,27 @@
-"""Ferramenta de inspeção detalhada de episódios.
+"""Ferramenta de inspeção detalhada de episódios (pure x pirl pareados).
 
-Este script carrega modelos treinados (pure/pirl) e executa vários
-episódios adicionais por (modo, seed), registrando passo a passo:
-  - estados (theta1, theta2, alvo), ações e recompensas,
-  - distância ponta–alvo, torques, velocidades, potência, energia,
-  - posição real da ponta (tip_x, tip_y) e saturação de torque.
+Carrega os modelos treinados de pure e pirl e executa os mesmos episódios
+nos dois modos: o ambiente de cada modo usa o mesmo ``target_seed`` (= seed),
+então o episódio de índice i tem o MESMO alvo em pure e em pirl. Isso torna as
+curvas de distância, torque e energia comparáveis lado a lado.
 
-Para cada (modo, seed), ele seleciona episódios "representativos"
-(sucesso de baixa/alta energia e falha de alta energia) e salva
-CSV detalhados em results/episodios_inspecao/.
+Para cada seed, registra passo a passo estados, ações, recompensas, distância
+ponta–alvo, torques, velocidades, potência, energia, posição da ponta e
+saturação de torque, e escolhe episódios representativos PAREADOS (o mesmo
+índice nos dois modos):
 
-Uso recomendado (exemplo):
+  - low_energy_success:  ambos têm sucesso; menor energia média entre os dois;
+  - high_energy_success: ambos têm sucesso; maior energia média entre os dois;
+  - high_energy_fail:    pelo menos um dos modos falha; maior energia média.
 
-    python inspect_episodes.py --mode both --first-seed 0 --last-seed 4 \
+Salva CSVs detalhados (um por modo e tag) em results/episodios_inspecao/.
+
+Os run-tags dos treinos são obrigatórios e não têm padrão.
+
+Uso (a partir da raiz do projeto):
+
+    python scripts/inspect_episodes.py --first-seed 1 --last-seed 3 \
+        --pure-tag <tag_pure> --pirl-tag <tag_pirl> \
         --episodes-per-config 20 --max-steps 200
 
 """
@@ -31,9 +40,10 @@ _sys.path.insert(0, _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "
 from two_link_arm_env import TwoLinkArmEnv
 
 
-def get_model_path(mode: str, seed: int) -> str:
-    """Constroi o caminho padrao do modelo treinado."""
-    run_dir = os.path.join("runs", f"runs_{mode}", f"seed_{seed}")
+def get_model_path(mode: str, seed: int, run_tag: str = "") -> str:
+    """Constroi o caminho do modelo treinado (runs/runs_<mode>/seed_<seed>[_<tag>])."""
+    suffix = f"_{run_tag}" if run_tag else ""
+    run_dir = os.path.join("runs", f"runs_{mode}", f"seed_{seed}{suffix}")
     return os.path.join(run_dir, f"ppo_model_{seed}.zip")
 
 
@@ -42,15 +52,19 @@ def rollout_episodes(
     seed: int,
     episodes: int,
     max_steps: int,
+    run_tag: str = "",
+    target_seed: int | None = None,
 ) -> List[Dict[str, object]]:
     """Executa varios episodios e retorna lista de resultados.
+
+    Com o mesmo ``target_seed``, a sequencia de alvos e identica entre modos.
 
     Cada item contem:
       - "summary": dict com metricas por episodio
       - "traj": dict com listas passo a passo (para salvar depois)
     """
 
-    model_path = get_model_path(mode, seed)
+    model_path = get_model_path(mode, seed, run_tag)
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Modelo nao encontrado: {model_path}")
 
@@ -58,6 +72,7 @@ def rollout_episodes(
         render=False,
         reward_mode=mode,
         max_delta_theta=0.2,
+        target_seed=target_seed,
     )
     env = TimeLimit(env, max_episode_steps=max_steps)
     model = PPO.load(model_path, env=env)
@@ -278,52 +293,41 @@ def rollout_episodes(
     return all_eps
 
 
-def pick_representative_episodes(
-    episodes: List[Dict[str, object]],
-) -> Dict[str, Dict[str, object]]:
-    """Seleciona episodios representativos a partir de um lote.
+def pick_paired_episodes(
+    eps_pure: List[Dict[str, object]],
+    eps_pirl: List[Dict[str, object]],
+) -> Dict[str, int]:
+    """Escolhe indices de episodios representativos, validos para os DOIS modos.
 
-    Retorna um dicionario tag->episodio, onde tag pode ser:
-      - "low_energy_success"
-      - "high_energy_success"
-      - "high_energy_fail"
+    Os dois lotes devem ter sido gerados com o mesmo target_seed, de modo que
+    o episodio i tem o mesmo alvo em pure e em pirl. Retorna tag -> indice:
+      - "low_energy_success":  ambos com sucesso, menor energia media dos dois
+      - "high_energy_success": ambos com sucesso, maior energia media dos dois
+      - "high_energy_fail":    pelo menos um falha, maior energia media dos dois
     """
+    n = min(len(eps_pure), len(eps_pirl))
+    sp = [e["summary"] for e in eps_pure[:n]]  # type: ignore[index]
+    sr = [e["summary"] for e in eps_pirl[:n]]  # type: ignore[index]
 
-    # extrai listas de indices e summaries
-    summaries: List[Dict[str, object]] = [e["summary"] for e in episodes]  # type: ignore[index]
+    for i in range(n):
+        if abs(float(sp[i]["target_radius"]) - float(sr[i]["target_radius"])) > 1e-9:
+            raise RuntimeError(
+                f"Alvos diferentes no episodio {i} entre pure e pirl; "
+                "os lotes precisam usar o mesmo target_seed."
+            )
 
-    def indices_where(cond) -> List[int]:
-        return [i for i, s in enumerate(summaries) if cond(s)]
+    def mean_energy(i: int) -> float:
+        return 0.5 * (float(sp[i]["energy"]) + float(sr[i]["energy"]))
 
-    idx_succ = indices_where(lambda s: s["success"] == 1)
-    idx_fail = indices_where(lambda s: s["success"] == 0)
+    both_ok = [i for i in range(n) if sp[i]["success"] == 1 and sr[i]["success"] == 1]
+    any_fail = [i for i in range(n) if sp[i]["success"] == 0 or sr[i]["success"] == 0]
 
-    selected: Dict[str, Dict[str, object]] = {}
-
-    def best_by_energy(indices: List[int], *, reverse: bool) -> int | None:
-        if not indices:
-            return None
-        energies = [summaries[i]["energy"] for i in indices]
-        order = np.argsort(energies)
-        if reverse:
-            return indices[int(order[-1])]
-        return indices[int(order[0])]
-
-    # sucesso com menor energia
-    i_low = best_by_energy(idx_succ, reverse=False)
-    if i_low is not None:
-        selected["low_energy_success"] = episodes[i_low]
-
-    # sucesso com maior energia
-    i_high = best_by_energy(idx_succ, reverse=True)
-    if i_high is not None:
-        selected["high_energy_success"] = episodes[i_high]
-
-    # falha com maior energia
-    i_fail_high = best_by_energy(idx_fail, reverse=True)
-    if i_fail_high is not None:
-        selected["high_energy_fail"] = episodes[i_fail_high]
-
+    selected: Dict[str, int] = {}
+    if both_ok:
+        selected["low_energy_success"] = min(both_ok, key=mean_energy)
+        selected["high_energy_success"] = max(both_ok, key=mean_energy)
+    if any_fail:
+        selected["high_energy_fail"] = max(any_fail, key=mean_energy)
     return selected
 
 
@@ -452,10 +456,16 @@ def main() -> None:
         )
     )
     parser.add_argument(
-        "--mode",
-        choices=["pure", "pirl", "both"],
-        default="both",
-        help="Qual modo inspecionar (pure, pirl ou both).",
+        "--pure-tag",
+        type=str,
+        default=None,
+        help="run_tag do treino pure (obrigatorio; use \"\" para runs sem tag).",
+    )
+    parser.add_argument(
+        "--pirl-tag",
+        type=str,
+        default=None,
+        help="run_tag do treino pirl (obrigatorio; use \"\" para runs sem tag).",
     )
     parser.add_argument(
         "--seeds",
@@ -496,31 +506,43 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    if args.pure_tag is None or args.pirl_tag is None:
+        raise SystemExit("Informe --pure-tag e --pirl-tag (nao ha padrao).")
+
     seeds = parse_seeds_arg(args.seeds, args.first_seed, args.last_seed)
-    modes = ["pure", "pirl"] if args.mode == "both" else [args.mode]
+    tags = {"pure": args.pure_tag, "pirl": args.pirl_tag}
 
     for seed in seeds:
-        for mode in modes:
-            print("\n" + "=" * 80)
-            print(f"Inspecionando modo={mode}, seed={seed}")
-            print("=" * 80)
+        print()
+        print("=" * 80)
+        print(f"Inspecionando seed={seed} (pure x pirl, mesmo target_seed={seed})")
+        print("=" * 80)
 
-            episodes = rollout_episodes(
+        eps = {
+            mode: rollout_episodes(
                 mode=mode,
                 seed=seed,
                 episodes=args.episodes_per_config,
                 max_steps=args.max_steps,
+                run_tag=tags[mode],
+                target_seed=seed,
             )
+            for mode in ("pure", "pirl")
+        }
 
-            selected = pick_representative_episodes(episodes)
+        selected = pick_paired_episodes(eps["pure"], eps["pirl"])
+        if not selected:
+            print("  Nenhum episodio representativo encontrado.")
 
-            for tag, ep_data in selected.items():
+        for tag, idx in selected.items():
+            for mode in ("pure", "pirl"):
+                ep_data = eps[mode][idx]
                 summary = ep_data["summary"]  # type: ignore[index]
                 traj = ep_data["traj"]  # type: ignore[index]
 
                 fname = f"mode_{mode}_seed{seed}_{tag}.csv"
                 out_path = os.path.join(args.out_dir, fname)
-                print(f"  Salvando episodio '{tag}' em: {out_path}")
+                print(f"  Salvando '{tag}' (episodio {idx}, {mode}) em: {out_path}")
                 save_episode_csv(out_path, summary, traj)
 
 

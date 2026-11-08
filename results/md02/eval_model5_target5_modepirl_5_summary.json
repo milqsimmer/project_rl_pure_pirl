@@ -12,6 +12,16 @@
     "std_tau_effort": 0.7703254840349909,
     "median_tau_effort": 1.0163942823958183,
     "mean_energy": 1.4786944242692854,
-    "std_energy": 0.32916378810251856
+    "std_energy": 0.32916378810251856,
+    "mean_peak_tau": 19.86341916148037,
+    "mean_tau_sat_rate": 0.03341190676392238,
+    "mean_peak_omega": 4.800251373576384,
+    "mean_omega_near_rate": 0.919521852744972,
+    "mean_omega_over_rate": 0.0,
+    "mean_peak_abs_theta": 2.1185498048365115,
+    "mean_theta_near_limit_rate": 0.0799,
+    "mean_cmd_over_limit_rate": 0.07832499999999999,
+    "mean_jerk_rms": 20731.95283707414,
+    "mean_action_delta_mean": 0.0029797672938808462
   }
 ]

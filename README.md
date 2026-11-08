@@ -214,10 +214,14 @@ python scripts/runs/run_eval_target_seeds.py --mode both --model-first-seed 0 --
   ```
 
 - Inspeção detalhada de episódios representativos (baixa/alta energia,
-  sucesso/fracasso) e geração de CSVs passo a passo:
+  sucesso/fracasso) e geração de CSVs passo a passo. Pure e pirl rodam os
+  **mesmos episódios** (mesmo `target_seed` = seed, logo o mesmo alvo), o que torna
+  as curvas comparáveis; os run-tags são obrigatórios:
   ```bash
-  python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 4 \
+  python scripts/inspect_episodes.py --first-seed 1 --last-seed 3 \
+      --pure-tag <tag_pure> --pirl-tag <tag_pirl> \
       --episodes-per-config 20 --max-steps 200
+  python scripts/graficos/script_plot_inspected_episodes.py   # figuras pareadas -> figs/figs_episodios_inspecao/
   ```
 
 - Figuras dos episódios inspecionados (lê `results/episodios_inspecao/`):
@@ -249,8 +253,8 @@ python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 \
 # 3) Análises de escalas e episódios representativos
 python scripts/analyze_scales.py --mode both --policy trained --seed 0 \
     --episodes 50 --max-steps 200
-python scripts/inspect_episodes.py --mode both --first-seed 0 --last-seed 0 \
-    --episodes-per-config 20 --max-steps 200
+python scripts/inspect_episodes.py --first-seed 0 --last-seed 0 \
+    --pure-tag "" --pirl-tag "" --episodes-per-config 20 --max-steps 200
 
 # 4) Geração de gráficos e tabelas agregadas
 python scripts/graficos/plot_train.py --seeds 0 --pure-tag "" --pirl-tag ""

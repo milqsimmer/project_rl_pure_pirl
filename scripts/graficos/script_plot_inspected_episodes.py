@@ -1,6 +1,21 @@
+"""Figuras pareadas pure x pirl dos episodios inspecionados.
+
+Le os CSV de results/episodios_inspecao/ (gerados por scripts/inspect_episodes.py,
+que roda o MESMO episodio, com o mesmo alvo, nos dois modos) e salva em
+figs/figs_episodios_inspecao/, para cada seed e tag:
+
+  seed<S>_<tag>_paired.pdf            distancia, torque e energia acumulada
+  seed<S>_<tag>_tip_traj_paired.pdf   trajetoria da ponta no plano
+
+Pares cujo alvo difere entre pure e pirl sao ignorados (nao comparaveis).
+
+Uso: python scripts/graficos/script_plot_inspected_episodes.py
+"""
+
+import argparse
 import os
 import re
-from typing import Dict, List, Tuple
+from typing import Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,8 +23,7 @@ import pandas as pd
 
 
 INSPECT_DIR = "results/episodios_inspecao"
-OUT_DIR_SINGLE = "figs/figs_episodios_inspecao/single"
-OUT_DIR_PAIRED = "figs/figs_episodios_inspecao/paired"
+OUT_DIR = "figs/figs_episodios_inspecao"
 
 LABELS = {
     "pure": "RL puro",
@@ -36,11 +50,6 @@ def set_workspace_limits(ax: plt.Axes) -> None:
     ax.set_aspect("equal", adjustable="box")
 
 
-def ensure_dirs() -> None:
-    os.makedirs(OUT_DIR_SINGLE, exist_ok=True)
-    os.makedirs(OUT_DIR_PAIRED, exist_ok=True)
-
-
 def parse_filename(path: str) -> Tuple[str, int, str]:
     """Extrai (mode, seed, tag) do nome do arquivo.
 
@@ -58,91 +67,12 @@ def parse_filename(path: str) -> Tuple[str, int, str]:
     return mode, seed, tag
 
 
-def plot_single_episode(df: pd.DataFrame, mode: str, seed: int, tag: str) -> None:
-    """Gera gráficos básicos para um único episódio inspecionado."""
-
-    step = df["step"].values
-    dist = df["distance"].values
-    tau_sum = df["tau_sum"].values
-    cum_energy = df["cumulative_energy"].values
-
-    fig, axes = plt.subplots(3, 1, figsize=(7, 9), sharex=True)
-
-    axes[0].plot(step, dist)
-    axes[0].set_ylabel("Distância ao alvo (m)")
-
-    axes[1].plot(step, tau_sum)
-    axes[1].set_ylabel(r"Torque total $|\tau_1|+|\tau_2|$")
-
-    axes[2].plot(step, cum_energy)
-    axes[2].set_ylabel("Energia acumulada (unid.)")
-    axes[2].set_xlabel("Passo do episódio")
-
-    title_mode = LABELS.get(mode, mode)
-    fig.suptitle(f"{title_mode} – seed={seed}, {tag}")
-    fig.tight_layout(rect=(0, 0.03, 1, 0.95))
-
-    fname = f"mode_{mode}_seed{seed}_{tag}.pdf"
-    out_path = os.path.join(OUT_DIR_SINGLE, fname)
-    plt.savefig(out_path, format="pdf", bbox_inches="tight")
-    plt.close(fig)
-
-    # Trajetória da ponta no plano (tip_x, tip_y), se disponível
-    if "tip_x" in df.columns and "tip_y" in df.columns:
-        tip_x = df["tip_x"].values
-        tip_y = df["tip_y"].values
-
-        # alvo (assumindo constante ao longo do episodio)
-        target_x = df["target_x"].values[0]
-        target_y = df["target_y"].values[0]
-
-        # indices validos (sem NaN)
-        valid = np.isfinite(tip_x) & np.isfinite(tip_y)
-        if valid.any():
-            start_idx = int(np.argmax(valid))
-            end_idx = int(len(valid) - 1 - np.argmax(valid[::-1]))
-        else:
-            start_idx = end_idx = 0
-
-        fig2, ax2 = plt.subplots()
-
-        # trajetoria completa
-        ax2.plot(tip_x, tip_y, "-", label="trajetória da ponta")
-
-        # inicio e fim
-        ax2.scatter(
-            tip_x[start_idx],
-            tip_y[start_idx],
-            marker="x",
-            color="orange",
-            label="início",
-        )
-        ax2.scatter(
-            tip_x[end_idx],
-            tip_y[end_idx],
-            marker="x",
-            color="green",
-            label="fim",
-        )
-
-        # alvo
-        ax2.scatter(target_x, target_y, marker="*", color="red", label="alvo")
-
-        ax2.set_xlabel("Tip x (m)")
-        ax2.set_ylabel("Tip y (m)")
-        set_workspace_limits(ax2)
-        ax2.legend()
-        ax2.set_title(f"Trajetória da ponta – {title_mode}, seed={seed}, {tag}")
-        fig2.tight_layout()
-
-        fname2 = f"mode_{mode}_seed{seed}_{tag}_tip_traj.pdf"
-        out_path2 = os.path.join(OUT_DIR_SINGLE, fname2)
-        plt.savefig(out_path2, format="pdf", bbox_inches="tight")
-        plt.close(fig2)
-
-
 def plot_paired_episodes(
-    df_pure: pd.DataFrame, df_pirl: pd.DataFrame, seed: int, tag: str
+    df_pure: pd.DataFrame,
+    df_pirl: pd.DataFrame,
+    seed: int,
+    tag: str,
+    out_dir: str = OUT_DIR,
 ) -> None:
     """Compara pure vs pirl para o mesmo seed/tag em três curvas."""
 
@@ -182,7 +112,7 @@ def plot_paired_episodes(
     fig.tight_layout(rect=(0, 0.03, 1, 0.95))
 
     fname = f"seed{seed}_{tag}_paired.pdf"
-    out_path = os.path.join(OUT_DIR_PAIRED, fname)
+    out_path = os.path.join(out_dir, fname)
     plt.savefig(out_path, format="pdf", bbox_inches="tight")
     plt.close(fig)
 
@@ -261,48 +191,64 @@ def plot_paired_episodes(
         fig2.tight_layout()
 
         fname2 = f"seed{seed}_{tag}_tip_traj_paired.pdf"
-        out_path2 = os.path.join(OUT_DIR_PAIRED, fname2)
+        out_path2 = os.path.join(out_dir, fname2)
         plt.savefig(out_path2, format="pdf", bbox_inches="tight")
         plt.close(fig2)
 
 
-def main() -> None:
-    ensure_dirs()
+def targets_match(df_pure: pd.DataFrame, df_pirl: pd.DataFrame) -> bool:
+    """True se pure e pirl tem o mesmo alvo (e o mesmo indice de episodio)."""
+    tp = df_pure[["target_x", "target_y"]].iloc[0].values.astype(float)
+    tr = df_pirl[["target_x", "target_y"]].iloc[0].values.astype(float)
+    same_ep = df_pure["episode_idx"].iloc[0] == df_pirl["episode_idx"].iloc[0]
+    return bool(same_ep and np.allclose(tp, tr))
 
-    if not os.path.isdir(INSPECT_DIR):
-        raise SystemExit(f"Diretório de inspeção não encontrado: {INSPECT_DIR}")
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--inspect-dir", default=INSPECT_DIR)
+    ap.add_argument("--out-dir", default=OUT_DIR)
+    args = ap.parse_args()
+
+    out_dir = args.out_dir
+    os.makedirs(out_dir, exist_ok=True)
+
+    if not os.path.isdir(args.inspect_dir):
+        raise SystemExit(f"Diretório de inspeção não encontrado: {args.inspect_dir}")
 
     files = [
-        os.path.join(INSPECT_DIR, f)
-        for f in os.listdir(INSPECT_DIR)
+        os.path.join(args.inspect_dir, f)
+        for f in os.listdir(args.inspect_dir)
         if f.endswith(".csv")
     ]
     if not files:
-        raise SystemExit(f"Nenhum CSV encontrado em {INSPECT_DIR}")
+        raise SystemExit(f"Nenhum CSV encontrado em {args.inspect_dir}")
 
-    # 1) Plots individuais por arquivo
-    for path in files:
-        mode, seed, tag = parse_filename(path)
-        df = pd.read_csv(path)
-        print(f"Gerando gráficos single para {path}...")
-        plot_single_episode(df, mode, seed, tag)
-
-    # 2) Plots pareados pure vs pirl por (seed, tag)
+    # agrupa pure/pirl por (seed, tag)
     grouped: Dict[Tuple[int, str], Dict[str, str]] = {}
     for path in files:
         mode, seed, tag = parse_filename(path)
-        key = (seed, tag)
-        grouped.setdefault(key, {})[mode] = path
+        grouped.setdefault((seed, tag), {})[mode] = path
 
-    for (seed, tag), paths in grouped.items():
-        if "pure" in paths and "pirl" in paths:
-            print(f"Gerando gráfico pareado para seed={seed}, tag={tag}...")
-            df_pure = pd.read_csv(paths["pure"])
-            df_pirl = pd.read_csv(paths["pirl"])
-            plot_paired_episodes(df_pure, df_pirl, seed, tag)
+    n_ok = 0
+    for (seed, tag), paths in sorted(grouped.items()):
+        if "pure" not in paths or "pirl" not in paths:
+            print(f"Ignorando seed={seed}, tag={tag}: falta pure ou pirl.")
+            continue
+        df_pure = pd.read_csv(paths["pure"])
+        df_pirl = pd.read_csv(paths["pirl"])
+        if not targets_match(df_pure, df_pirl):
+            print(
+                f"Ignorando seed={seed}, tag={tag}: alvo/episodio diferente entre "
+                "pure e pirl (regenere com scripts/inspect_episodes.py)."
+            )
+            continue
+        print(f"Gerando gráfico pareado para seed={seed}, tag={tag}...")
+        plot_paired_episodes(df_pure, df_pirl, seed, tag, out_dir)
+        n_ok += 1
 
-    print("\nFiguras de episódios individuais em:", OUT_DIR_SINGLE)
-    print("Figuras comparando pure vs pirl em:", OUT_DIR_PAIRED)
+    print()
+    print(f"{n_ok} pares gerados em: {out_dir}")
 
 
 if __name__ == "__main__":
