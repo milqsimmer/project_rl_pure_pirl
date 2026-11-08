@@ -119,6 +119,36 @@ parser.add_argument(
         "(dist < success_threshold). Default=0.0 (sem bonus)."
     ),
 )
+parser.add_argument(
+    "--beta-omega",
+    type=float,
+    default=0.0,
+    dest="beta_omega",
+    help=(
+        "Peso da penalizacao por passo de velocidade articular acima do envelope "
+        "(80%% de 5 rad/s) no modo pirl. Default=0.0 (sem efeito)."
+    ),
+)
+parser.add_argument(
+    "--beta-tau",
+    type=float,
+    default=0.0,
+    dest="beta_tau",
+    help=(
+        "Peso da penalizacao por passo de torque acima do envelope (80%% de 20 N.m) "
+        "no modo pirl. Default=0.0 (sem efeito)."
+    ),
+)
+parser.add_argument(
+    "--beta-theta",
+    type=float,
+    default=0.0,
+    dest="beta_theta",
+    help=(
+        "Peso da penalizacao por passo de |theta| acima de 2.64 rad (limite 3.14) "
+        "no modo pirl. Default=0.0 (sem efeito)."
+    ),
+)
 args = parser.parse_args()
 
 set_global_seed(args.seed)
@@ -142,6 +172,9 @@ env = TwoLinkArmEnv(
     max_delta_theta=args.max_delta_theta,
     target_seed=target_seed_effective,
     success_bonus=args.success_bonus,
+    beta_omega=args.beta_omega,
+    beta_tau=args.beta_tau,
+    beta_theta=args.beta_theta,
 )
 env = TimeLimit(env, max_episode_steps=200)
 

@@ -17,6 +17,12 @@ class TwoLinkArmEnv(gym.Env):
         max_delta_theta: float = 0.1,
         target_seed: int | None = None,
         success_bonus: float = 0.0,
+        beta_omega: float = 0.0,
+        beta_tau: float = 0.0,
+        beta_theta: float = 0.0,
+        omega_env: float = 4.0,
+        tau_env: float = 16.0,
+        theta_env: float = 2.64,
     ):
         super(TwoLinkArmEnv, self).__init__()
         self.reward_mode = reward_mode
@@ -24,6 +30,16 @@ class TwoLinkArmEnv(gym.Env):
         # pesos da função de recompensa
         self.lambda_a = float(lambda_a)
         self.alpha_tau = float(alpha_tau)
+
+        # penalizações por passo (só no modo pirl) sobre um envelope de operação
+        # abaixo dos limites do URDF; todas com peso 0 por padrão (sem efeito).
+        # Cada termo é um hinge normalizado: max(0, |x| - x_env) / (x_limite - x_env)
+        self.beta_omega = float(beta_omega)
+        self.beta_tau = float(beta_tau)
+        self.beta_theta = float(beta_theta)
+        self.omega_env, self.omega_limit = float(omega_env), 5.0  # rad/s
+        self.tau_env, self.tau_limit = float(tau_env), 20.0  # N.m
+        self.theta_env, self.theta_limit = float(theta_env), 3.14  # rad
 
         # bônus opcional aplicado quando alcança o alvo (dist < success_threshold)
         self.success_bonus = float(success_bonus)
@@ -169,6 +185,11 @@ class TwoLinkArmEnv(gym.Env):
         # per-step: igual para pure e pirl; termos físicos entram apenas no terminal
         reward = -dist - lam_a * float(np.linalg.norm(action))
 
+        # PIRL: penalizações por passo (todo passo de todo episódio, inclusive os
+        # que falham) quando o envelope de velocidade/torque/limite articular é excedido
+        if self.reward_mode == "pirl":
+            reward -= self._envelope_penalty(tau1, tau2, vel1, vel2)
+
         done = dist < self.success_threshold
 
         # bônus de sucesso: aplica apenas no passo em que alcança o alvo
@@ -207,6 +228,29 @@ class TwoLinkArmEnv(gym.Env):
         }
 
         return obs, reward, done, info
+
+    @staticmethod
+    def _hinge(x: float, x_env: float, x_limit: float) -> float:
+        """max(0, |x| - x_env) / (x_limite - x_env)."""
+        width = max(x_limit - x_env, 1e-9)
+        return max(0.0, abs(float(x)) - x_env) / width
+
+    def _envelope_penalty(self, tau1, tau2, vel1, vel2) -> float:
+        """Penalização por passo por exceder o envelope de operação (pirl)."""
+        pen = 0.0
+        if self.beta_omega:
+            w = max(self._hinge(vel1, self.omega_env, self.omega_limit),
+                    self._hinge(vel2, self.omega_env, self.omega_limit))
+            pen += self.beta_omega * w
+        if self.beta_tau:
+            t = max(self._hinge(tau1, self.tau_env, self.tau_limit),
+                    self._hinge(tau2, self.tau_env, self.tau_limit))
+            pen += self.beta_tau * t
+        if self.beta_theta:
+            th = max(self._hinge(self.theta1, self.theta_env, self.theta_limit),
+                     self._hinge(self.theta2, self.theta_env, self.theta_limit))
+            pen += self.beta_theta * th
+        return float(pen) if not np.isnan(pen) else 0.0
 
     def _create_target_visual(self):
         if self.target_id is not None:
