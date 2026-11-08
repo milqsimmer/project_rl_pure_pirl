@@ -15,7 +15,7 @@ Arquivos, para cada seed `s`:
 
 São a entrada padrão de `scripts/graficos/plot_eval.py` (`--results-dir
 results/md02`), que gera as tabelas de `tabelas/` e as figuras de
-`figs/figs_resultados/`.
+`figs/figs_resultados/md02/`.
 
 Seed 0: o pure oficial está em `../baseline-oficial/` e o pirl `md02_at2e4`
 em `../pirl_alpha_tau_por_passo/`. Os testes de `alpha_tau` estão em

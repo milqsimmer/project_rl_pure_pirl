@@ -15,7 +15,8 @@ run-tag `md02_at<valor>`; `alpha_tau` = 0.01 (`at1e2`), 0.02 (`at2e2`) e
 continua com valores maiores na seed 0: `alpha_tau` = 0.1 (`at01_term`), 0.3
 (`at03_term`) e 0.5 (`at05_term`), modelos em
 `runs/runs_pirl/seed_0_md02_at0{1,3,5}_term/`. A validação do 0.3 nas seeds 1 a 10
-está em `../md02_at03_term/` (e `../../tabelas/pirl_at03_term/`), e o teste com
+está em `../md02_at03_term/` (tabelas em `../../tabelas/md02_at03_term/` e figuras em
+`../../figs/figs_resultados/md02_at03_term/`), e o teste com
 `alpha_tau` 1.0 e 3.0 (seed 1) em `../md02_at_sweep_seed1/`.
 
 ## Arquivos
