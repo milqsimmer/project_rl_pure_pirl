@@ -37,6 +37,14 @@ MOTION_KEYS = [
     "action_delta_mean",
 ]
 
+# Sensibilidade ao envelope: fracao de passos acima de p% de cada limite
+# (omega e tau: p% de OMEGA_LIMIT/TAU_LIMIT; theta: p% de THETA_LIMIT).
+ENVELOPE_PCTS = (70, 80, 90, 100)
+THETA_ENV_TRAIN = 2.64  # rad, envelope de theta dos pilotos antigos (agora 80% = 2.512 = theta_gt80)
+for _p in ENVELOPE_PCTS:
+    MOTION_KEYS += [f"omega_gt{_p}", f"tau_gt{_p}", f"theta_gt{_p}"]
+MOTION_KEYS += ["theta_gt_env"]
+
 
 def motion_metrics(
     theta_before: list,
@@ -85,7 +93,16 @@ def motion_metrics(
 
     a_delta = np.linalg.norm(np.diff(act, axis=0), axis=1) if n > 1 else np.array([])
 
+    env_rates = {}
+    for p in ENVELOPE_PCTS:
+        f = p / 100.0
+        env_rates[f"omega_gt{p}"] = float(np.mean(om_max > f * OMEGA_LIMIT))
+        env_rates[f"tau_gt{p}"] = float(np.mean(tau_max > f * TAU_LIMIT))
+        env_rates[f"theta_gt{p}"] = float(np.mean(th_max > f * THETA_LIMIT))
+    env_rates["theta_gt_env"] = float(np.mean(th_max > THETA_ENV_TRAIN))
+
     return {
+        **env_rates,
         "peak_tau": float(np.nanmax(tau_max)),
         "tau_sat_rate": float(np.mean(tau_max >= TAU_SAT_FRAC * TAU_LIMIT)),
         "peak_omega": float(np.nanmax(om_max)),
@@ -110,6 +127,7 @@ def evaluate(
     target_seed: int | None = None,
     success_bonus: float = 0.0,
     max_delta_theta: float = 0.1,
+    normalize_actions: bool = False,
 ):
     """Avalia um modelo salvo para um determinado modo ('pure' ou 'pirl')."""
     model_path = get_model_path(mode, seed, run_tag)
@@ -124,9 +142,12 @@ def evaluate(
         target_seed=target_seed,
         success_bonus=success_bonus,
         max_delta_theta=max_delta_theta,
+        normalize_actions=normalize_actions,
     )
     env = TimeLimit(env, max_episode_steps=max_steps)
     model = PPO.load(model_path, env=env)
+    # acoes registradas em rad/passo (desfaz a normalizacao para as metricas)
+    act_scale = max_delta_theta if normalize_actions else 1.0
 
     # tenta descobrir o dt do ambiente base (TwoLinkArmEnv)
     base_env = env
@@ -173,7 +194,10 @@ def evaluate(
             last_info = info
 
             th_after.append([float(obs[0]), float(obs[1])])
-            acts.append([float(action[0]), float(action[1])])
+            acts.append(
+                [float(np.clip(action[0], -1, 1) * act_scale if normalize_actions else action[0]),
+                 float(np.clip(action[1], -1, 1) * act_scale if normalize_actions else action[1])]
+            )
             taus.append([float(info.get("tau1", np.nan)), float(info.get("tau2", np.nan))])
             omegas.append(
                 [float(info.get("omega1", np.nan)), float(info.get("omega2", np.nan))]
@@ -413,6 +437,12 @@ if __name__ == "__main__":
             "para evitar erro de incompatibilidade de action_space."
         ),
     )
+    ap.add_argument(
+        "--normalize-actions",
+        action="store_true",
+        dest="normalize_actions",
+        help="Use a mesma flag do treino (espaco de acao [-1, 1] escalado pelo ambiente).",
+    )
 
     args = ap.parse_args()
 
@@ -437,6 +467,7 @@ if __name__ == "__main__":
             target_seed=target_seed_effective,
             success_bonus=args.success_bonus,
             max_delta_theta=args.max_delta_theta,
+            normalize_actions=args.normalize_actions,
         )
         summaries.append(summary)
         all_rows.extend(rows)

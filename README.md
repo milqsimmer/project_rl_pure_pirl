@@ -103,7 +103,7 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
    python train_rl.py --mode pure --seed 0 --steps 2000000 --learning-rate 3e-4
    ```
 
-2. Modo "pirl" (mesmo reward por passo do pure + penalização terminal do torque médio do episódio, peso `--alpha-tau`):
+2. Modo "pirl" (reward do pure + penalização de torque **por passo** `alpha_tau·(|τ₁|+|τ₂|)`, peso `--alpha-tau`; use `--alpha-tau-mode terminal` para a versão que penaliza o torque médio só no passo de sucesso):
    ```bash
    python train_rl.py --mode pirl --seed 0 --steps 2000000 --learning-rate 3e-4
    ```
@@ -142,9 +142,10 @@ Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos �
 >
 > Runs oficiais: pure com `--run-tag md02` e pirl com `--alpha-tau 2e-4 --run-tag md02_at2e4`,
 > seeds 0 a 10. O `plot_train.py` não tem tag padrão: passe `--pure-tag` e `--pirl-tag`. As runs
-> `md02_at2e4` foram treinadas com a penalização de torque por passo
-> (versão anterior do reward); as runs `*_term` usam a penalização terminal,
-> com `alpha_tau = 0.3` (`md02_at03_term`) como valor escolhido.
+> `md02_at2e4` foram treinadas com a penalização de torque por passo (hoje o padrão,
+> `--alpha-tau-mode per_step`); as runs `*_term` usaram a penalização terminal e, para
+> reproduzi-las, precisam de `--alpha-tau-mode terminal` (valor escolhido lá:
+> `alpha_tau = 0.3`, `md02_at03_term`).
 
 4. Saídas dos treinos:
     - `runs/runs_pure/seed_<seed>[_<run-tag>]/monitor.csv` e `ppo_model_<seed>.zip`.
@@ -232,7 +233,7 @@ python scripts/runs/run_eval_target_seeds.py --mode both --model-first-seed 0 --
 - Geração de gráficos e tabelas agregadas (sucesso, distância, esforço, energia):
   ```bash
   python scripts/graficos/plot_train.py --seeds 1-10 --pure-tag <tag_pure> --pirl-tag <tag_pirl>   # -> figs/figs_treino/
-  python scripts/graficos/plot_eval.py --first-seed 1 --last-seed 10   # tabelas/ e figs/figs_resultados/
+  python scripts/graficos/plot_eval.py --first-seed 1 --last-seed 10   # tabelas/ e figs/figs_resultados/md02/ (uma pasta por avaliação)
   python scripts/graficos/plot_arm_from_env.py              # figura do braço -> figs/figs_env/
   ```
 

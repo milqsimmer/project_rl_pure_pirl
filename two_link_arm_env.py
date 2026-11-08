@@ -20,9 +20,11 @@ class TwoLinkArmEnv(gym.Env):
         beta_omega: float = 0.0,
         beta_tau: float = 0.0,
         beta_theta: float = 0.0,
+        normalize_actions: bool = False,
         omega_env: float = 4.0,
         tau_env: float = 16.0,
-        theta_env: float = 2.64,
+        theta_env: float = 2.512,  # 80% de 3.14 (pilotos antigos usaram 2.64)
+        alpha_tau_mode: str = "per_step",
     ):
         super(TwoLinkArmEnv, self).__init__()
         self.reward_mode = reward_mode
@@ -30,6 +32,14 @@ class TwoLinkArmEnv(gym.Env):
         # pesos da função de recompensa
         self.lambda_a = float(lambda_a)
         self.alpha_tau = float(alpha_tau)
+
+        # como alpha_tau age no modo pirl:
+        #   "per_step": reward -= alpha_tau * (|tau1|+|tau2|) a cada passo (padrao)
+        #   "terminal": reward -= alpha_tau * torque_medio_do_episodio, so no passo
+        #               em que o alvo e atingido (usado pelas runs *_term)
+        if alpha_tau_mode not in ("per_step", "terminal"):
+            raise ValueError("alpha_tau_mode deve ser 'per_step' ou 'terminal'")
+        self.alpha_tau_mode = alpha_tau_mode
 
         # penalizações por passo (só no modo pirl) sobre um envelope de operação
         # abaixo dos limites do URDF; todas com peso 0 por padrão (sem efeito).
@@ -49,6 +59,9 @@ class TwoLinkArmEnv(gym.Env):
 
         # variação máxima de ângulo por passo (módulo da ação)
         self.max_delta_theta = float(max_delta_theta)
+
+        # se True, a política atua em [-1, 1] e o ambiente escala por max_delta_theta
+        self.normalize_actions = bool(normalize_actions)
 
         # gerador de números aleatórios para os alvos (independente do np.random global)
         if target_seed is None:
@@ -85,12 +98,21 @@ class TwoLinkArmEnv(gym.Env):
             dtype=np.float32,
         )
 
-        # Ações: variação nos ângulos das juntas (incrementos)
-        self.action_space = spaces.Box(
-            low=np.array([-self.max_delta_theta, -self.max_delta_theta]),
-            high=np.array([self.max_delta_theta, self.max_delta_theta]),
-            dtype=np.float32,
-        )
+        # Ações: variação nos ângulos das juntas (incrementos).
+        # Com normalize_actions=True o espaço da política é [-1, 1] e o ambiente
+        # multiplica por max_delta_theta (prática recomendada pelo SB3); assim a
+        # média da política não satura longe do limite e o reward consegue
+        # empurrá-la. Com False (padrão) o espaço é [-max_delta_theta, +max_delta_theta].
+        if self.normalize_actions:
+            self.action_space = spaces.Box(
+                low=-np.ones(2), high=np.ones(2), dtype=np.float32
+            )
+        else:
+            self.action_space = spaces.Box(
+                low=np.array([-self.max_delta_theta, -self.max_delta_theta]),
+                high=np.array([self.max_delta_theta, self.max_delta_theta]),
+                dtype=np.float32,
+            )
 
         self.target_pos = None
         self.state = None
@@ -133,6 +155,11 @@ class TwoLinkArmEnv(gym.Env):
         return obs
 
     def step(self, action):
+        # ação em radianos por passo (desfaz a normalização, se ativa)
+        action = np.asarray(action, dtype=np.float64)
+        if self.normalize_actions:
+            action = np.clip(action, -1.0, 1.0) * self.max_delta_theta
+
         # interpreta a ação como incremento em ângulo sobre o estado ATUAL
         # (estado atual é sempre sincronizado com o Bullet via getJointStates)
         th1_target = np.clip(self.theta1 + action[0], -np.pi, np.pi)
@@ -182,12 +209,20 @@ class TwoLinkArmEnv(gym.Env):
         # RL puro: -distância + penalidade leve de ação
         lam_a = self.lambda_a
 
-        # per-step: igual para pure e pirl; termos físicos entram apenas no terminal
         reward = -dist - lam_a * float(np.linalg.norm(action))
 
-        # PIRL: penalizações por passo (todo passo de todo episódio, inclusive os
-        # que falham) quando o envelope de velocidade/torque/limite articular é excedido
         if self.reward_mode == "pirl":
+            # PIRL (padrao): penalizacao de torque a cada passo, proporcional a
+            # |tau1| + |tau2|, em todo passo de todo episodio
+            if (
+                self.alpha_tau_mode == "per_step"
+                and self.alpha_tau != 0.0
+                and not np.isnan(tau_sum)
+            ):
+                reward -= self.alpha_tau * tau_sum
+
+            # penalizacoes de envelope por passo (velocidade/torque/limite articular);
+            # pesos beta = 0 por padrao (sem efeito)
             reward -= self._envelope_penalty(tau1, tau2, vel1, vel2)
 
         done = dist < self.success_threshold
@@ -196,8 +231,13 @@ class TwoLinkArmEnv(gym.Env):
         if done and self.success_bonus != 0.0:
             reward += self.success_bonus
 
-        # penalização de torque média apenas no passo terminal no modo pirl
-        if done and self.reward_mode == "pirl" and self.alpha_tau != 0.0:
+        # modo "terminal": penalizacao de torque medio apenas no passo terminal (pirl)
+        if (
+            done
+            and self.reward_mode == "pirl"
+            and self.alpha_tau_mode == "terminal"
+            and self.alpha_tau != 0.0
+        ):
             mean_tau = (
                 self.ep_tau_sum_total / self.ep_steps
                 if self.ep_steps > 0

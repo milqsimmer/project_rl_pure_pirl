@@ -256,8 +256,14 @@ interfaces. New agents should prefer the newer helpers when possible.
   - Reward modes remain `pure` and `pirl`.
   - New parameters on `TwoLinkArmEnv.__init__` (all with defaults):
     - `lambda_a`: weight on action penalty (norm of `Δtheta`).
-    - `alpha_tau`: weight on torque penalty (only used in `pirl`, as a
-      terminal penalty on mean torque per episode).
+    - `alpha_tau`: weight on torque penalty (only used in `pirl`). With
+      `alpha_tau_mode="per_step"` (default) it penalizes
+      `alpha_tau * (|tau1|+|tau2|)` at every step; with `"terminal"` it
+      penalizes `alpha_tau * mean torque` only at the success step (`*_term` runs).
+    - `beta_omega` / `beta_tau` / `beta_theta`: optional per-step hinge penalties
+      (pirl) above an 80% operating envelope (4.0 rad/s, 16 N·m, 2.512 rad);
+      default 0 (no effect). `normalize_actions`: policy acts in [-1, 1] and the
+      env scales by `max_delta_theta` (default False).
     - `step_sleep`: optional `time.sleep` after `p.stepSimulation()` when
       `render=True` (used to slow down visual training).
     - `max_delta_theta`: max absolute increment per joint per step;
@@ -307,7 +313,7 @@ interfaces. New agents should prefer the newer helpers when possible.
     (`results/md02/eval_model*_target*_mode*_*.csv`, see `--results-dir`), writes the summary tables
     (`tabelas/resumo_geral_todos_csvs.csv`, `resumo_por_seed.csv`,
     `target_distance_success.csv`) and 5 pure vs pirl figures (`--figures`:
-    `boxplot`, `summary` (mean±std), `tradeoff` (energy x success), `seed-grid`
+    `boxplot`, `summary` (boxplots with per-seed points), `tradeoff` (energy x success), `seed-grid`
     (per-seed bars), `target-distance` (success vs initial tip–target distance)).
   - `watch_train.py` and `watch_arm.py` are interactive helpers for
     monitoring reward/success curves and 2D arm motion during/after
@@ -325,10 +331,10 @@ interfaces. New agents should prefer the newer helpers when possible.
 - Official runs and pirl reward history:
   - Official run tags: `md02` (pure) and `md02_at2e4` (pirl,
     `alpha_tau=2e-4`), seeds 0–10 (evals for seeds 1–10 in `results/`).
-  - The `md02_at2e4` runs were trained with the earlier per-step torque
-    penalty in `pirl`. The terminal-only torque penalty described above is
-    used by the later `*_term` runs, where the chosen value is
-    `alpha_tau = 0.3` (run-tag `md02_at03_term`).
+  - The `md02_at2e4` runs were trained with the per-step torque penalty (now
+    the default, `--alpha-tau-mode per_step`). The `*_term` runs used the
+    terminal-only penalty and need `--alpha-tau-mode terminal` to be reproduced;
+    their chosen value was `alpha_tau = 0.3` (run-tag `md02_at03_term`).
 
 ## 10. Current tuning plan (2026-10): pure first, then pirl
 

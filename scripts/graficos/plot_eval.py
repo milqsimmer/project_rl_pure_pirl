@@ -13,9 +13,10 @@ Tabelas (--tables-dir, default tabelas/):
     limites_movimento.csv         limites articulares, velocidade, torque e jerk
                                   (média ± dp entre seeds; requer colunas do eval_rl.py atual)
 
-Figuras (--out-dir, default figs/figs_resultados/), escolhidas com --figures:
+Figuras (--out-dir, default figs/figs_resultados/<nome de --results-dir>/, ex.:
+figs/figs_resultados/md02/), escolhidas com --figures:
     boxplot         fig1_boxplot_combined.pdf          boxplot por seed (sucesso, distância)
-    summary         fig3_resumo_barras.pdf             barras média±dp entre seeds (sucesso, dist, torque, energia)
+    summary         fig3_resumo_boxplot.pdf            boxplot por seed + pontos (sucesso, dist, torque, energia)
     tradeoff        fig4_tradeoff_energia_sucesso.pdf  energia x sucesso, um ponto por seed
     seed-grid       fig_per_seed_grid.pdf              barras pure x pirl por seed, 4 métricas
     target-distance fig_target_distance_success.pdf    sucesso x distância inicial ponta-alvo
@@ -265,13 +266,25 @@ def seed_values(seed_summary: pd.DataFrame, mode: str, col: str) -> np.ndarray:
     return seed_summary[seed_summary["mode_norm"] == mode][col].values
 
 
-def draw_mean_std_bars(ax, seed_summary: pd.DataFrame, metric) -> None:
-    """Barras pure x pirl com média ± desvio calculados sobre as seeds."""
+def draw_boxplot(ax, seed_summary: pd.DataFrame, metric) -> None:
+    """Boxplot pure x pirl da métrica por seed, com os pontos (uma seed = um ponto).
+
+    Caixa = quartis, linha laranja = mediana, triângulo verde = média; os pontos
+    mostram cada seed (com pequeno deslocamento horizontal para não se sobreporem).
+    """
     col, ylabel, ylim = metric
-    pure, pirl = (seed_values(seed_summary, m, col) for m in MODES)
-    means = [np.nanmean(pure), np.nanmean(pirl)]
-    stds = [np.nanstd(pure, ddof=1), np.nanstd(pirl, ddof=1)]
-    ax.bar(np.arange(2), means, yerr=stds, tick_label=[LABELS[m] for m in MODES], capsize=5)
+    data = [seed_values(seed_summary, m, col) for m in MODES]
+    ax.boxplot(
+        data,
+        tick_labels=[LABELS[m] for m in MODES],
+        showmeans=True,
+        showfliers=False,  # os pontos de cada seed já aparecem (incluindo outliers)
+        widths=0.5,
+    )
+    rng = np.random.RandomState(0)
+    for i, vals in enumerate(data, start=1):
+        ax.scatter(i + rng.uniform(-0.12, 0.12, len(vals)), vals, s=14, alpha=0.6,
+                   color="gray", zorder=3)
     ax.set_ylabel(ylabel)
     if ylim is not None:
         ax.set_ylim(*ylim)
@@ -317,14 +330,27 @@ def fig_seed_grid(seed_summary, out_dir, **_) -> None:
     save_fig(fig, out_dir, "fig_per_seed_grid.pdf")
 
 
-# ========= FIGURAS: resumo entre seeds (média ± dp) =========
+# ========= FIGURAS: resumo entre seeds (distribuição por seed) =========
 def fig_summary(seed_summary, out_dir, **_) -> None:
     metrics = available_metrics(seed_summary, [M_SUCCESS, M_DIST, M_TAU, M_ENERGY])
     n_cols = (len(metrics) + 1) // 2
     fig, axes = plt.subplots(2, n_cols, figsize=(5 * n_cols, 8))
     for ax, metric in zip(np.atleast_1d(axes).flatten(), metrics):
-        draw_mean_std_bars(ax, seed_summary, metric)
-    save_fig(fig, out_dir, "fig3_resumo_barras.pdf")
+        draw_boxplot(ax, seed_summary, metric)
+
+    from matplotlib.lines import Line2D
+
+    handles = [
+        Line2D([0], [0], color="orange", lw=2, label="Mediana"),
+        Line2D([0], [0], marker="^", color="w", markerfacecolor="green",
+               markeredgecolor="green", markersize=9, label="Média"),
+        Line2D([0], [0], marker="o", color="w", markerfacecolor="gray",
+               markeredgecolor="gray", alpha=0.6, markersize=6, label="Seed"),
+    ]
+    # legenda abaixo dos painéis (incluída no recorte por bbox_inches="tight")
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.0),
+               ncol=3, frameon=False)
+    save_fig(fig, out_dir, "fig3_resumo_boxplot.pdf")
 
 
 def fig_tradeoff(seed_summary, out_dir, **_) -> None:
@@ -415,7 +441,9 @@ def parse_args() -> argparse.Namespace:
                     help="Pasta dos CSVs do pure (default: --results-dir).")
     ap.add_argument("--pirl-dir", default=None,
                     help="Pasta dos CSVs do pirl (default: --results-dir).")
-    ap.add_argument("--out-dir", default="figs/figs_resultados")
+    ap.add_argument("--out-dir", default=None,
+                    help="Pasta das figuras (default: figs/figs_resultados/<nome de "
+                         "--results-dir>, ex.: figs/figs_resultados/md02).")
     ap.add_argument("--tables-dir", default="tabelas")
     return ap.parse_args()
 
@@ -432,6 +460,11 @@ def main() -> None:
     if unknown:
         raise SystemExit(f"--figures inválido: {unknown}; use 'all' ou {list(FIGURES)}")
 
+    if args.out_dir is None:
+        # uma pasta de figuras por avaliação, com o mesmo nome da pasta de resultados
+        args.out_dir = os.path.join(
+            "figs", "figs_resultados", os.path.basename(os.path.normpath(args.results_dir))
+        )
     os.makedirs(args.out_dir, exist_ok=True)
     os.makedirs(args.tables_dir, exist_ok=True)
 

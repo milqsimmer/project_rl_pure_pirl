@@ -70,6 +70,17 @@ parser.add_argument(
     help="Peso da penalidade de torque na recompensa (modo pirl).",
 )
 parser.add_argument(
+    "--alpha-tau-mode",
+    choices=["per_step", "terminal"],
+    default="per_step",
+    dest="alpha_tau_mode",
+    help=(
+        "Como alpha_tau age no modo pirl: per_step (padrao) = penaliza "
+        "alpha_tau*(|tau1|+|tau2|) a cada passo; terminal = penaliza alpha_tau*torque "
+        "medio so no passo de sucesso (runs *_term)."
+    ),
+)
+parser.add_argument(
     "--learning-rate",
     type=float,
     default=3e-4,
@@ -145,8 +156,18 @@ parser.add_argument(
     default=0.0,
     dest="beta_theta",
     help=(
-        "Peso da penalizacao por passo de |theta| acima de 2.64 rad (limite 3.14) "
+        "Peso da penalizacao por passo de |theta| acima de 2.512 rad (80%% do limite 3.14) "
         "no modo pirl. Default=0.0 (sem efeito)."
+    ),
+)
+parser.add_argument(
+    "--normalize-actions",
+    action="store_true",
+    dest="normalize_actions",
+    help=(
+        "Espaco de acao da politica em [-1, 1] (o ambiente escala por "
+        "max_delta_theta). Evita a saturacao da media da politica no limite da acao. "
+        "Use a mesma flag na avaliacao."
     ),
 )
 args = parser.parse_args()
@@ -175,6 +196,8 @@ env = TwoLinkArmEnv(
     beta_omega=args.beta_omega,
     beta_tau=args.beta_tau,
     beta_theta=args.beta_theta,
+    normalize_actions=args.normalize_actions,
+    alpha_tau_mode=args.alpha_tau_mode,
 )
 env = TimeLimit(env, max_episode_steps=200)
 
