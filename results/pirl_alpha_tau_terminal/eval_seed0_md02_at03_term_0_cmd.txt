@@ -9,6 +9,6 @@ args_json: {
   "print_episodes": false,
   "run_tag": "md02_at03_term",
   "target_seed": null,
-  "max_delta_theta": 0.2,
-  "success_bonus": 5.0
+  "success_bonus": 5.0,
+  "max_delta_theta": 0.2
 }
