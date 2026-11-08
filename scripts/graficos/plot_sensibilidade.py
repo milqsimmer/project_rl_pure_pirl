@@ -113,7 +113,8 @@ def main() -> None:
     for spec in args.group:
         if "=" not in spec:
             raise SystemExit(f"--group deve ser ROTULO=GLOB, recebi: {spec}")
-        label, pattern = spec.split("=", 1)
+        # o rótulo pode conter "=" (ex.: "pirl a=0.01"); o padrão de arquivos não
+        label, pattern = spec.rsplit("=", 1)
         groups[label.strip()] = load_group(label.strip(), pattern.strip())
 
     os.makedirs(args.out_dir, exist_ok=True)
