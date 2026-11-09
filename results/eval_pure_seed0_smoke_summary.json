@@ -1,0 +1,69 @@
+{
+  "success": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "final_distance": {
+    "mean": 0.4930048165638592,
+    "std_between_episodes": 0.07940839784049793
+  },
+  "length": {
+    "mean": 60.0,
+    "std_between_episodes": 0.0
+  },
+  "elapsed_s": {
+    "mean": 2.0,
+    "std_between_episodes": 0.0
+  },
+  "torque_abs_integral": {
+    "mean": 4.8165696414487,
+    "std_between_episodes": 2.4978977911103963
+  },
+  "torque_sq_integral": {
+    "mean": 21.52112074214639,
+    "std_between_episodes": 18.34501054577555
+  },
+  "energy_abs": {
+    "mean": 2.2212191223220903,
+    "std_between_episodes": 1.9003147502634976
+  },
+  "peak_tau": {
+    "mean": 8.983052134079944,
+    "std_between_episodes": 4.730540689289106
+  },
+  "peak_omega": {
+    "mean": 0.5558201240996461,
+    "std_between_episodes": 0.29400592873356757
+  },
+  "torque_envelope_rate": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "velocity_envelope_rate": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "position_envelope_rate": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "tau_sat_rate": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "safe_episode": {
+    "mean": 1.0,
+    "std_between_episodes": 0.0
+  },
+  "safe_success": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "metadata": {
+    "model_path": "runs\\pure\\seed_0_smoke\\ppo_model.zip",
+    "train_seed": 0,
+    "target_seed": 10000,
+    "episodes": 10,
+    "notes": "Variabilidade entre episódios, não entre seeds de treinamento."
+  }
+}
