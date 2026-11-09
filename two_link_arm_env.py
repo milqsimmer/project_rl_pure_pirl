@@ -79,7 +79,13 @@ class TwoLinkArmEnv(gym.Env):
         self.dt = float(params.get("fixedTimeStep", 1.0 / 240.0))
 
         self.plane = p.loadURDF("plane.urdf")
-        self.robot = p.loadURDF("two_link_arm.urdf", basePosition=[0, 0, 0])
+        self.robot = p.loadURDF(
+            "two_link_arm_v2.urdf",
+            basePosition=[0, 0, 0],
+            useFixedBase=True,
+            flags=p.URDF_USE_INERTIA_FROM_FILE,
+            physicsClientId=self.physicsClient
+        )
 
         self.link1 = 0
         self.link2 = 1
@@ -312,12 +318,18 @@ class TwoLinkArmEnv(gym.Env):
                 return [x, y]
 
     def _apply_angles(self, theta1, theta2):
-        p.setJointMotorControl2(
-            self.robot, 0, p.POSITION_CONTROL, targetPosition=theta1, force=20
-        )
-        p.setJointMotorControl2(
-            self.robot, 1, p.POSITION_CONTROL, targetPosition=theta2, force=20
-        )
+        targets = [theta1, theta2]
+
+        for joint_id, target in enumerate(targets):
+            p.setJointMotorControl2(
+                bodyUniqueId=self.robot,
+                jointIndex=joint_id,
+                controlMode=p.POSITION_CONTROL,
+                targetPosition=float(target),
+                force=20.0,
+                maxVelocity=5.0,
+                physicsClientId=self.physicsClient
+            )
 
     def _get_end_effector_pos(self):
         ls = p.getLinkState(self.robot, self.link2, computeForwardKinematics=True)
