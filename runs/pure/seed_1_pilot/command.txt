@@ -1,0 +1,1 @@
+C:\Users\milla\mestrado\projeto\.venv\Scripts\python.exe --seed 1 --steps 300000 --run-tag pilot

@@ -1,0 +1,50 @@
+{
+  "created_utc": "2026-11-09T16:48:42.678643+00:00",
+  "args": {
+    "seed": 1,
+    "steps": 300000,
+    "run_tag": "pilot",
+    "learning_rate": 0.0003,
+    "lambda_action": 0.01,
+    "success_bonus": 5.0,
+    "max_delta_theta": 0.1,
+    "device": "cpu",
+    "tensorboard": false
+  },
+  "versions": {
+    "python": "3.11.5 (tags/v3.11.5:cce6ba9, Aug 24 2023, 14:38:34) [MSC v.1936 64 bit (AMD64)]",
+    "gymnasium": "1.4.0",
+    "sb3": "2.9.2",
+    "numpy": "2.4.6",
+    "torch": "2.15.0+cpu"
+  },
+  "algorithm": "PPO",
+  "policy_kwargs": {
+    "net_arch": {
+      "pi": [
+        64,
+        64
+      ],
+      "vf": [
+        64,
+        64
+      ]
+    },
+    "activation_fn": "Tanh"
+  },
+  "ppo_kwargs": {
+    "n_steps": 2048,
+    "batch_size": 256,
+    "n_epochs": 10,
+    "gamma": 0.99,
+    "gae_lambda": 0.95,
+    "clip_range": 0.2
+  },
+  "physics": {
+    "physics_hz": 240,
+    "decision_hz": 30,
+    "episode_seconds": 2.0,
+    "force_limit": 20.0,
+    "velocity_limit": 5.0
+  }
+}

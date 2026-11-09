@@ -1,0 +1,69 @@
+{
+  "success": {
+    "mean": 0.43,
+    "std_between_episodes": 0.497569851956243
+  },
+  "final_distance": {
+    "mean": 0.2958320284517428,
+    "std_between_episodes": 0.27356459118137516
+  },
+  "length": {
+    "mean": 43.02,
+    "std_between_episodes": 20.00806907931968
+  },
+  "elapsed_s": {
+    "mean": 1.4340000000000002,
+    "std_between_episodes": 0.6669356359773225
+  },
+  "torque_abs_integral": {
+    "mean": 5.012584857875324,
+    "std_between_episodes": 2.272142717267752
+  },
+  "torque_sq_integral": {
+    "mean": 36.77603287254613,
+    "std_between_episodes": 20.064134812679338
+  },
+  "energy_abs": {
+    "mean": 10.061033468923092,
+    "std_between_episodes": 5.1295057235980135
+  },
+  "peak_tau": {
+    "mean": 19.588504329952844,
+    "std_between_episodes": 1.402979744280632
+  },
+  "peak_omega": {
+    "mean": 4.211578678910618,
+    "std_between_episodes": 0.010380140729481582
+  },
+  "torque_envelope_rate": {
+    "mean": 0.029840401712682624,
+    "std_between_episodes": 0.030092578827255932
+  },
+  "velocity_envelope_rate": {
+    "mean": 0.06796343327190357,
+    "std_between_episodes": 0.030742313670427623
+  },
+  "position_envelope_rate": {
+    "mean": 0.22416071428571432,
+    "std_between_episodes": 0.24723327965388597
+  },
+  "tau_sat_rate": {
+    "mean": 0.026055776945659876,
+    "std_between_episodes": 0.02819433337674574
+  },
+  "safe_episode": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "safe_success": {
+    "mean": 0.0,
+    "std_between_episodes": 0.0
+  },
+  "metadata": {
+    "model_path": "runs\\pure\\seed_0_pilot\\ppo_model.zip",
+    "train_seed": 0,
+    "target_seed": 10000,
+    "episodes": 100,
+    "notes": "Variabilidade entre episódios, não entre seeds de treinamento."
+  }
+}
