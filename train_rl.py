@@ -1,239 +1,93 @@
+"""Treinamento piloto PPO para TwoLinkArmEnv (RL puro).
+
+Uso: python train_rl.py --seed 0 --steps 300000 --run-tag pilot
+"""
 import argparse
 import json
-import os
 import random
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
 import numpy as np
-import gym
-from gym.wrappers import TimeLimit
+import torch
+import gymnasium
+import stable_baselines3
 from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from two_link_arm_env import TwoLinkArmEnv
 
 
-def set_global_seed(seed: int):
-    random.seed(seed)
-    np.random.seed(seed)
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--seed', type=int, default=0)
+    ap.add_argument('--steps', type=int, default=300_000)
+    ap.add_argument('--run-tag', default='pilot')
+    ap.add_argument('--learning-rate', type=float, default=3e-4)
+    ap.add_argument('--lambda-action', type=float, default=0.01)
+    ap.add_argument('--success-bonus', type=float, default=5.0)
+    ap.add_argument('--max-delta-theta', type=float, default=0.1)
+    ap.add_argument('--device', default='cpu')
+    ap.add_argument('--tensorboard', action='store_true')
+    args = ap.parse_args()
+    if args.steps <= 0 or args.max_delta_theta <= 0:
+        ap.error('--steps e --max-delta-theta devem ser positivos')
+    # Protege contra sobrescrita silenciosa de treinos existentes.
+    tag = f'_{args.run_tag}' if args.run_tag else ''
+    run_dir = Path('runs') / 'pure' / f'seed_{args.seed}{tag}'
+    model_path = run_dir / 'ppo_model.zip'
+    if model_path.exists():
+        ap.error(f'Modelo já existe: {model_path} (use outro --run-tag)')
+    run_dir.mkdir(parents=True, exist_ok=True)
 
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    config = {
+        'created_utc': datetime.now(timezone.utc).isoformat(),
+        'args': vars(args),
+        'versions': {'python': sys.version, 'gymnasium': gymnasium.__version__,
+                     'sb3': stable_baselines3.__version__, 'numpy': np.__version__,
+                     'torch': torch.__version__},
+        'algorithm': 'PPO',
+        'policy_kwargs': {'net_arch': {'pi': [64, 64], 'vf': [64, 64]}, 'activation_fn': 'Tanh'},
+        'ppo_kwargs': {'n_steps': 2048, 'batch_size': 256, 'n_epochs': 10,
+                       'gamma': 0.99, 'gae_lambda': 0.95, 'clip_range': 0.2},
+        'physics': {'physics_hz': 240, 'decision_hz': 30, 'episode_seconds': 2.0,
+                    'force_limit': 20.0, 'velocity_limit': 5.0},
+    }
+    (run_dir / 'config.json').write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding='utf8')
+    (run_dir / 'command.txt').write_text(' '.join([sys.executable] + sys.argv[1:]), encoding='utf8')
 
-def get_run_dir(mode: str, seed: int, run_tag: str = "") -> str:
-    suffix = f"_" + run_tag if run_tag else ""
-    return os.path.join("runs", f"runs_{mode}", f"seed_{seed}{suffix}")
-
-
-def get_model_path(mode: str, seed: int, run_tag: str = "") -> str:
-    return os.path.join(get_run_dir(mode, seed, run_tag), f"ppo_model_{seed}.zip")
-
-
-def get_monitor_path(mode: str, seed: int, run_tag: str = "") -> str:
-    return os.path.join(get_run_dir(mode, seed, run_tag), "monitor.csv")
-
-
-def save_train_command_log(args: argparse.Namespace, run_dir: str) -> None:
-    """Salva, na pasta de treino, o comando e os parametros usados."""
-
-    log_path = os.path.join(run_dir, "train_cmd.txt")
+    env = TwoLinkArmEnv(lambda_action=args.lambda_action,
+                          success_bonus=args.success_bonus,
+                          max_delta_theta=args.max_delta_theta)
+    env.action_space.seed(args.seed)
+    # Monitor coleta métricas entregues pelo próprio ambiente no fim do episódio.
+    monitor = Monitor(env, filename=str(run_dir / 'monitor.csv'),
+                      info_keywords=('is_success', 'distance', 'elapsed_s',
+                                     'torque_abs_integral', 'torque_sq_integral',
+                                     'energy_abs', 'torque_envelope_rate',
+                                     'velocity_envelope_rate', 'position_envelope_rate',
+                                     'torque_saturation_rate', 'safe_episode', 'safe_success'))
     try:
-        cmdline = " ".join([sys.executable] + sys.argv[1:])
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write("command: " + cmdline + "\n")
-            f.write(
-                "args_json: "
-                + json.dumps(vars(args), ensure_ascii=False, indent=2)
-                + "\n"
-            )
-    except Exception as e:
-        print(f"[train_rl] Aviso: nao foi possivel salvar log de comando: {e}")
+        monitor.reset(seed=args.seed)
+        model = PPO('MlpPolicy', monitor, seed=args.seed,
+                    policy_kwargs=dict(net_arch=dict(pi=[64, 64], vf=[64, 64]),
+                                       activation_fn=torch.nn.Tanh),
+                    learning_rate=args.learning_rate, n_steps=2048,
+                    batch_size=256, n_epochs=10, gamma=0.99,
+                    gae_lambda=0.95, clip_range=0.2,
+                    tensorboard_log=str(Path('runs') / 'tensorboard') if args.tensorboard else None,
+                    device=args.device, verbose=1)
+        model.learn(total_timesteps=args.steps,
+                    tb_log_name=f'pure_s{args.seed}{tag}')
+        model.save(str(model_path))
+    finally:
+        monitor.close()
+    print(f'\nTreinamento concluído. Modelo: {model_path}')
+    print(f'Monitor: {run_dir / "monitor.csv"}')
 
 
-parser = argparse.ArgumentParser()
-parser.add_argument("--mode", choices=["pure", "pirl"], default="pure")
-parser.add_argument("--steps", type=int, default=300_000)
-parser.add_argument("--seed", type=int, default=0)
-parser.add_argument(
-    "--run-tag",
-    type=str,
-    default="",
-    help="Sufixo opcional para distinguir execucoes com mesma seed.",
-)
-parser.add_argument(
-    "--lambda-a",
-    type=float,
-    default=0.03,
-    dest="lambda_a",
-    help="Peso da penalidade de acao na recompensa.",
-)
-parser.add_argument(
-    "--alpha-tau",
-    type=float,
-    default=0.001,
-    help="Peso da penalidade de torque na recompensa (modo pirl).",
-)
-parser.add_argument(
-    "--alpha-tau-mode",
-    choices=["per_step", "terminal"],
-    default="per_step",
-    dest="alpha_tau_mode",
-    help=(
-        "Como alpha_tau age no modo pirl: per_step (padrao) = penaliza "
-        "alpha_tau*(|tau1|+|tau2|) a cada passo; terminal = penaliza alpha_tau*torque "
-        "medio so no passo de sucesso (runs *_term)."
-    ),
-)
-parser.add_argument(
-    "--learning-rate",
-    type=float,
-    default=3e-4,
-    dest="learning_rate",
-    help="Taxa de aprendizado do otimizador PPO.",
-)
-parser.add_argument(
-    "--render",
-    action="store_true",
-    help="Se definido, abre a GUI do PyBullet durante o treino.",
-)
-parser.add_argument(
-    "--step-sleep",
-    type=float,
-    default=0.0,
-    help=(
-        "Pausa em segundos apos cada passo de simulacao quando --render esta ativo "
-        "(para desacelerar a animacao)."
-    ),
-)
-parser.add_argument(
-    "--target-seed",
-    type=int,
-    default=None,
-    help=(
-        "Seed usada apenas para amostrar os alvos do ambiente. "
-        "Permite alinhar a sequencia de alvos entre pure/pirl."
-    ),
-)
-parser.add_argument(
-    "--max-delta-theta",
-    type=float,
-    default=0.1,
-    dest="max_delta_theta",
-    help=(
-        "Modulo maximo da variacao de angulo por passo (acao) em radianos. "
-        "Default=0.1 (~5.7 graus)."
-    ),
-)
-parser.add_argument(
-    "--success-bonus",
-    type=float,
-    default=0.0,
-    dest="success_bonus",
-    help=(
-        "Bonus adicional somado ao reward no passo em que o alvo e alcancado "
-        "(dist < success_threshold). Default=0.0 (sem bonus)."
-    ),
-)
-parser.add_argument(
-    "--beta-omega",
-    type=float,
-    default=0.0,
-    dest="beta_omega",
-    help=(
-        "Peso da penalizacao por passo de velocidade articular acima do envelope "
-        "(80%% de 5 rad/s) no modo pirl. Default=0.0 (sem efeito)."
-    ),
-)
-parser.add_argument(
-    "--beta-tau",
-    type=float,
-    default=0.0,
-    dest="beta_tau",
-    help=(
-        "Peso da penalizacao por passo de torque acima do envelope (80%% de 20 N.m) "
-        "no modo pirl. Default=0.0 (sem efeito)."
-    ),
-)
-parser.add_argument(
-    "--beta-theta",
-    type=float,
-    default=0.0,
-    dest="beta_theta",
-    help=(
-        "Peso da penalizacao por passo de |theta| acima de 2.512 rad (80%% do limite 3.14) "
-        "no modo pirl. Default=0.0 (sem efeito)."
-    ),
-)
-parser.add_argument(
-    "--normalize-actions",
-    action="store_true",
-    dest="normalize_actions",
-    help=(
-        "Espaco de acao da politica em [-1, 1] (o ambiente escala por "
-        "max_delta_theta). Evita a saturacao da media da politica no limite da acao. "
-        "Use a mesma flag na avaliacao."
-    ),
-)
-args = parser.parse_args()
-
-set_global_seed(args.seed)
-
-target_seed_effective = args.target_seed if args.target_seed is not None else args.seed
-
-run_dir = get_run_dir(args.mode, args.seed, args.run_tag)
-os.makedirs(run_dir, exist_ok=True)
-
-monitor_path = get_monitor_path(args.mode, args.seed, args.run_tag)
-model_path = get_model_path(args.mode, args.seed, args.run_tag)
-
-save_train_command_log(args, run_dir)
-
-env = TwoLinkArmEnv(
-    render=args.render,
-    reward_mode=args.mode,
-    lambda_a=args.lambda_a,
-    alpha_tau=args.alpha_tau,
-    step_sleep=args.step_sleep,
-    max_delta_theta=args.max_delta_theta,
-    target_seed=target_seed_effective,
-    success_bonus=args.success_bonus,
-    beta_omega=args.beta_omega,
-    beta_tau=args.beta_tau,
-    beta_theta=args.beta_theta,
-    normalize_actions=args.normalize_actions,
-    alpha_tau_mode=args.alpha_tau_mode,
-)
-env = TimeLimit(env, max_episode_steps=200)
-
-# IMPORTANTE:
-# info_keywords registra colunas extras no monitor.csv no fim de cada episódio
-env = Monitor(
-    env,
-    filename=monitor_path,
-    info_keywords=(
-        "is_success",
-        "final_distance",
-        "tau_sum_total",
-        "episode_energy",
-        "episode_mean_tau_sum",
-    ),
-)
-
-model = PPO(
-    "MlpPolicy",
-    env,
-    verbose=1,
-    seed=args.seed,
-    learning_rate=args.learning_rate,
-    n_steps=2048,
-    batch_size=256,
-    n_epochs=10,
-    gamma=0.99,
-    gae_lambda=0.95,
-    clip_range=0.2,
-)
-
-model.learn(total_timesteps=args.steps)
-
-model.save(model_path)
-env.close()
-
-print(f"[OK] Treino {args.mode} finalizado.")
-print(f"[OK] Monitor salvo em: {monitor_path}")
-print(f"[OK] Modelo salvo em: {model_path}")
+if __name__ == '__main__':
+    main()

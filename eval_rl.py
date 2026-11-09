@@ -1,477 +1,128 @@
-import os, json, csv, time, argparse, sys
-import numpy as np
-import gym
+"""Avaliação determinística pareada para políticas treinadas no ambiente atual.
+
+Não reaproveitar com pesos legados: espaço de observação e dinâmica mudaram.
+"""
 import argparse
-from gym.wrappers import TimeLimit
+import csv
+import json
+from pathlib import Path
+
+import numpy as np
 from stable_baselines3 import PPO
 from two_link_arm_env import TwoLinkArmEnv
 
 
-def get_run_dir(mode: str, seed: int, run_tag: str = "") -> str:
-    suffix = f"_" + run_tag if run_tag else ""
-    return os.path.join("runs", f"runs_{mode}", f"seed_{seed}{suffix}")
-
-
-def get_model_path(mode: str, seed: int, run_tag: str = "") -> str:
-    return os.path.join(get_run_dir(mode, seed, run_tag), f"ppo_model_{seed}.zip")
-
-
-# Limites de referencia (valores declarados em two_link_arm.urdf)
-THETA_LIMIT = 3.14  # rad, limite articular
-THETA_MARGIN = 0.2  # rad, "perto do limite" = a um passo de acao (max_delta_theta)
-OMEGA_LIMIT = 5.0  # rad/s, velocity do URDF
-OMEGA_NEAR_FRAC = 0.9  # "perto do limite de velocidade" = >= 90% do limite
-TAU_LIMIT = 20.0  # N.m, effort do URDF / force do motor
-TAU_SAT_FRAC = 0.99  # saturado = >= 99% do torque maximo
-
-MOTION_KEYS = [
-    "peak_tau",
-    "tau_sat_rate",
-    "peak_omega",
-    "omega_near_rate",
-    "omega_over_rate",
-    "peak_abs_theta",
-    "theta_near_limit_rate",
-    "cmd_over_limit_rate",
-    "jerk_rms",
-    "action_delta_mean",
-]
-
-# Sensibilidade ao envelope: fracao de passos acima de p% de cada limite
-# (omega e tau: p% de OMEGA_LIMIT/TAU_LIMIT; theta: p% de THETA_LIMIT).
-ENVELOPE_PCTS = (70, 80, 90, 100)
-THETA_ENV_TRAIN = 2.64  # rad, envelope de theta dos pilotos antigos (agora 80% = 2.512 = theta_gt80)
-for _p in ENVELOPE_PCTS:
-    MOTION_KEYS += [f"omega_gt{_p}", f"tau_gt{_p}", f"theta_gt{_p}"]
-MOTION_KEYS += ["theta_gt_env"]
-
-
-def motion_metrics(
-    theta_before: list,
-    theta_after: list,
-    actions: list,
-    tau: list,
-    omega: list,
-    dt: float,
-) -> dict:
-    """Metricas de limites, velocidade, torque e suavidade de um episodio.
-
-    Cada lista tem um item por passo; theta/tau/omega/acoes sao pares (junta 1, 2).
-    - peak_tau / tau_sat_rate: pico de |tau| e fracao de passos com alguma junta
-      em >= TAU_SAT_FRAC * TAU_LIMIT.
-    - peak_omega / omega_near_rate / omega_over_rate: pico de |omega| e fracao de
-      passos com |omega| >= OMEGA_NEAR_FRAC*OMEGA_LIMIT e > OMEGA_LIMIT.
-    - peak_abs_theta / theta_near_limit_rate: pico de |theta| e fracao de passos
-      com |theta| >= THETA_LIMIT - THETA_MARGIN.
-    - cmd_over_limit_rate: fracao de passos em que o alvo comandado
-      (theta_antes + acao) ultrapassa THETA_LIMIT (o Bullet impede de passar).
-    - jerk_rms: raiz da media de jerk^2 (rad/s^3), por diferenca finita de omega
-      (com omega_0 = 0), sobre as duas juntas.
-    - action_delta_mean: media de ||a_t - a_(t-1)||.
-    """
-    n = len(tau)
-    nan = float("nan")
-    if n == 0:
-        return {k: nan for k in MOTION_KEYS}
-
-    th_b = np.abs(np.asarray(theta_before, dtype=float))
-    th_a = np.abs(np.asarray(theta_after, dtype=float))
-    act = np.asarray(actions, dtype=float)
-    ta = np.abs(np.asarray(tau, dtype=float))
-    om = np.asarray(omega, dtype=float)
-
-    tau_max = np.nanmax(ta, axis=1)
-    om_max = np.nanmax(np.abs(om), axis=1)
-    th_max = np.nanmax(th_a, axis=1)
-    cmd = np.abs(np.asarray(theta_before, dtype=float) + act)
-
-    # jerk por diferenca finita de omega (omega antes do 1o passo = 0)
-    om0 = np.vstack([np.zeros((1, 2)), om])
-    acc = np.diff(om0, axis=0) / dt
-    jerk = np.diff(acc, axis=0) / dt
-    jerk_rms = float(np.sqrt(np.nanmean(jerk**2))) if jerk.size else nan
-
-    a_delta = np.linalg.norm(np.diff(act, axis=0), axis=1) if n > 1 else np.array([])
-
-    env_rates = {}
-    for p in ENVELOPE_PCTS:
-        f = p / 100.0
-        env_rates[f"omega_gt{p}"] = float(np.mean(om_max > f * OMEGA_LIMIT))
-        env_rates[f"tau_gt{p}"] = float(np.mean(tau_max > f * TAU_LIMIT))
-        env_rates[f"theta_gt{p}"] = float(np.mean(th_max > f * THETA_LIMIT))
-    env_rates["theta_gt_env"] = float(np.mean(th_max > THETA_ENV_TRAIN))
-
-    return {
-        **env_rates,
-        "peak_tau": float(np.nanmax(tau_max)),
-        "tau_sat_rate": float(np.mean(tau_max >= TAU_SAT_FRAC * TAU_LIMIT)),
-        "peak_omega": float(np.nanmax(om_max)),
-        "omega_near_rate": float(np.mean(om_max >= OMEGA_NEAR_FRAC * OMEGA_LIMIT)),
-        "omega_over_rate": float(np.mean(om_max > OMEGA_LIMIT)),
-        "peak_abs_theta": float(np.nanmax(th_max)),
-        "theta_near_limit_rate": float(np.mean(th_max >= THETA_LIMIT - THETA_MARGIN)),
-        "cmd_over_limit_rate": float(np.mean(np.nanmax(cmd, axis=1) > THETA_LIMIT)),
-        "jerk_rms": jerk_rms,
-        "action_delta_mean": float(np.mean(a_delta)) if a_delta.size else nan,
-    }
-
-
-def evaluate(
-    mode: str,
-    episodes: int = 100,
-    render: bool = False,
-    max_steps: int = 200,
-    print_episodes: bool = False,
-    seed: int = 0,
-    run_tag: str = "",
-    target_seed: int | None = None,
-    success_bonus: float = 0.0,
-    max_delta_theta: float = 0.1,
-    normalize_actions: bool = False,
-):
-    """Avalia um modelo salvo para um determinado modo ('pure' ou 'pirl')."""
-    model_path = get_model_path(mode, seed, run_tag)
-    print(f"Carregando modelo do caminho: {model_path}")
-    if not os.path.isfile(model_path):
-        raise FileNotFoundError(f"Modelo não encontrado: {model_path}")
-
-    # env legado (gym 0.21): reset()->obs ; step()->(obs, reward, done, info)
-    env = TwoLinkArmEnv(
-        render=render,
-        reward_mode=mode,
-        target_seed=target_seed,
-        success_bonus=success_bonus,
-        max_delta_theta=max_delta_theta,
-        normalize_actions=normalize_actions,
-    )
-    env = TimeLimit(env, max_episode_steps=max_steps)
-    model = PPO.load(model_path, env=env)
-    # acoes registradas em rad/passo (desfaz a normalizacao para as metricas)
-    act_scale = max_delta_theta if normalize_actions else 1.0
-
-    # tenta descobrir o dt do ambiente base (TwoLinkArmEnv)
-    base_env = env
-    if hasattr(base_env, "env"):
-        base_env = base_env.env
-    dt = getattr(base_env, "dt", 1.0 / 240.0)
-
-    # posicao inicial aproximada da ponta quando theta1=theta2=0
-    try:
-        l1 = float(getattr(base_env, "l1", 0.5))
-        l2 = float(getattr(base_env, "l2", 0.5))
-    except Exception:
-        l1, l2 = 0.5, 0.5
-    tip_init_x = l1 + l2
-    tip_init_y = 0.0
-
-    ep_rows = []
-    succ = 0
-    dists, lens = [], []
-    efforts = []  # lista de E_i por episódio
-    energies = []  # energia total aproximada por episódio
-    motion = []  # metricas de limites/velocidade/torque/suavidade por episodio
-
-    for ep in range(episodes):
-        obs = env.reset()
-        done = False
-        # distancia inicial do alvo (raio no plano xy) e em relacao a ponta inicial
-        _, _, tx0, ty0 = map(float, obs)
-        target_r0 = float(np.hypot(tx0, ty0))
-        tip_init_dist0 = float(np.hypot(tx0 - tip_init_x, ty0 - tip_init_y))
-
-        ep_ret, ep_len = 0.0, 0
-        ep_tau_sum = 0.0  # soma_t ||tau_t||_1 no episódio
-        ep_energy = 0.0  # soma_t power_t * dt no episódio
-        last_info = {}
-        th_before, th_after, acts, taus, omegas = [], [], [], [], []
-
-        while not done:
-            action, _ = model.predict(obs, deterministic=True)
-            th_before.append([float(obs[0]), float(obs[1])])
-            obs, reward, done, info = env.step(action)
-            ep_ret += reward
-            ep_len += 1
-            last_info = info
-
-            th_after.append([float(obs[0]), float(obs[1])])
-            acts.append(
-                [float(np.clip(action[0], -1, 1) * act_scale if normalize_actions else action[0]),
-                 float(np.clip(action[1], -1, 1) * act_scale if normalize_actions else action[1])]
-            )
-            taus.append([float(info.get("tau1", np.nan)), float(info.get("tau2", np.nan))])
-            omegas.append(
-                [float(info.get("omega1", np.nan)), float(info.get("omega2", np.nan))]
-            )
-
-            tau_sum = float(info.get("tau_sum", np.nan))
-            if not np.isnan(tau_sum):
-                ep_tau_sum += tau_sum
-
-            power = float(info.get("power", np.nan))
-            if not np.isnan(power):
-                ep_energy += power * dt
-
-            if render:
-                time.sleep(1 / 240.0)
-
-        final_dist = float(last_info.get("distance", np.nan))
-
-        # se o ambiente fornecer acumuladores por episódio, usa-os
-        ep_tau_sum_env = float(last_info.get("tau_sum_total", np.nan))
-        ep_energy_env = float(last_info.get("episode_energy", np.nan))
-        if not np.isnan(ep_tau_sum_env):
-            ep_tau_sum = ep_tau_sum_env
-        if not np.isnan(ep_energy_env):
-            ep_energy = ep_energy_env
-
-        if final_dist < 0.05:
-            succ += 1
-
-        # esforço médio em torque: E_i = (1/T_i) * sum_t ||tau_t||_1
-        if ep_len > 0:
-            E_i = ep_tau_sum / ep_len
-        else:
-            E_i = np.nan
-
-        mm = motion_metrics(th_before, th_after, acts, taus, omegas, dt)
-
-        dists.append(final_dist)
-        lens.append(ep_len)
-        efforts.append(E_i)
-        energies.append(ep_energy)
-        motion.append(mm)
-
-        if print_episodes:
-            print(
-                f"[{mode}] ep {ep+1}/{episodes} - "
-                f"dist_final={final_dist:.4f}, ret={ep_ret:.2f}, "
-                f"len={ep_len}, E_i={E_i:.4f}"
-            )
-
-        ep_rows.append(
-            {
-                "mode": mode,
-                "seed": seed,
-                "episode": ep + 1,
-                "success": int(final_dist < 0.05),
-                "final_distance": final_dist,
-                "return": ep_ret,
-                "length": ep_len,
-                "mean_tau_sum": E_i,  # esforço médio em torque
-                "tau_sum_total": ep_tau_sum,  # soma de ||tau_t||_1 no episódio
-                "energy": ep_energy,
-                "target_radius": target_r0,
-                "tip_init_dist": tip_init_dist0,
-                **mm,
-            }
-        )
-
-    env.close()
-
-    summary = {
-        "mode": mode,
-        "seed": seed,
-        "episodes": episodes,
-        "success_rate": succ / episodes,
-        "mean_final_dist": float(np.nanmean(dists)),
-        "std_final_dist": float(np.nanstd(dists)),
-        "mean_ep_len": float(np.mean(lens)),
-        "std_ep_len": float(np.std(lens)),
-        "mean_tau_effort": float(np.nanmean(efforts)),
-        "std_tau_effort": float(np.nanstd(efforts)),
-        "median_tau_effort": float(np.nanmedian(efforts)),
-        "mean_energy": float(np.nanmean(energies)),
-        "std_energy": float(np.nanstd(energies)),
-    }
-    for k in MOTION_KEYS:
-        vals = [m[k] for m in motion]
-        summary[f"mean_{k}"] = float(np.nanmean(vals))
-    return summary, ep_rows
-
-
-def save_eval_command_log(args: argparse.Namespace) -> None:
-    """Salva, na pasta de resultados, o comando e os parametros usados."""
-
-    base = f"{args.out}_{args.seed}"
-    dir_name = os.path.dirname(base)
-    if dir_name:
-        os.makedirs(dir_name, exist_ok=True)
-    log_path = base + "_cmd.txt"
-
-    try:
-        cmdline = " ".join([sys.executable] + sys.argv[1:])
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write("command: " + cmdline + "\n")
-            f.write(
-                "args_json: "
-                + json.dumps(vars(args), ensure_ascii=False, indent=2)
-                + "\n"
-            )
-    except Exception as e:
-        print(f"[eval_rl] Aviso: nao foi possivel salvar log de comando: {e}")
-
-
-def save_csv(csv_path: str, rows: list, summaries: list):
-    dir_name = os.path.dirname(csv_path)
-    if dir_name:  # só cria diretório se tiver pasta no caminho
-        os.makedirs(dir_name, exist_ok=True)
-    # salva por-episódio
-    fieldnames = [
-        "mode",
-        "seed",
-        "episode",
-        "success",
-        "final_distance",
-        "return",
-        "length",
-        "mean_tau_sum",
-        "tau_sum_total",
-        "energy",
-        "target_radius",
-        "tip_init_dist",
-    ] + MOTION_KEYS
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=fieldnames)
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
-    # salva um segundo arquivo com os resumos
-    base, ext = os.path.splitext(csv_path)
-    sum_path = base + "_summary.json"
-    with open(sum_path, "w", encoding="utf-8") as f:
-        json.dump(summaries, f, ensure_ascii=False, indent=2)
-    return csv_path, sum_path
-
-
-def print_summary_table(summaries: list):
-    # impressão amigável lado a lado
-    def fmt(x):
-        return f"{x:.4f}" if isinstance(x, float) else str(x)
-
-    headers = [
-        "mode",
-        "seed",
-        "episodes",
-        "success_rate",
-        "mean_final_dist",
-        "mean_ep_len",
-        "mean_tau_effort",
-        "mean_energy",
-    ]
-    widths = [max(len(h), 14) for h in headers]
-    line = " | ".join(h.ljust(w) for h, w in zip(headers, widths))
-    print(line)
-    print("-" * len(line))
-    for s in summaries:
-        row = [
-            s["mode"],
-            s["seed"],
-            s["episodes"],
-            fmt(s["success_rate"]),
-            fmt(s["mean_final_dist"]),
-            fmt(s["mean_ep_len"]),
-            fmt(s.get("mean_tau_effort", float("nan"))),
-            fmt(s.get("mean_energy", float("nan"))),
-        ]
-        print(" | ".join(str(c).ljust(w) for c, w in zip(row, widths)))
-
-
-if __name__ == "__main__":
+def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument(
-        "--mode",
-        choices=["pure", "pirl", "both"],
-        default="both",
-        help="Qual modelo avaliar.",
-    )
-    ap.add_argument("--seed", type=int, default=0, help="Seed para reproducibilidade.")
-    ap.add_argument("--episodes", type=int, default=100, help="Episódios por modo.")
-    ap.add_argument(
-        "--render", action="store_true", help="Renderiza durante avaliação."
-    )
-    ap.add_argument(
-        "--max-steps",
-        type=int,
-        default=200,
-        help="Limite de passos por episódio (TimeLimit).",
-    )
-    ap.add_argument(
-        "--out", default="results/eval_results", help="Caminho do CSV por-episódio."
-    )
-    ap.add_argument(
-        "--print-episodes",
-        action="store_true",
-        help="Imprime métricas por episódio (só para o modo selecionado).",
-    )
-    ap.add_argument(
-        "--run-tag",
-        type=str,
-        default="",
-        help="Sufixo opcional usado no diretório de treino (seed_X_<tag>).",
-    )
-    ap.add_argument(
-        "--target-seed",
-        type=int,
-        default=None,
-        help=(
-            "Seed usada apenas para amostrar os alvos do ambiente na avaliacao. "
-            "Use o mesmo valor no treino para alinhar a sequencia de alvos."
-        ),
-    )
-    ap.add_argument(
-        "--success-bonus",
-        type=float,
-        default=0.0,
-        help=(
-            "Bonus adicional somado ao reward no passo em que o alvo e alcancado "
-            "(dist < success_threshold) durante a avaliacao."
-        ),
-    )
-    ap.add_argument(
-        "--max-delta-theta",
-        type=float,
-        default=0.1,
-        help=(
-            "Modulo maximo da variacao de angulo por passo (acao) em radianos "
-            "durante a avaliacao. Deve coincidir com o valor usado no treino "
-            "para evitar erro de incompatibilidade de action_space."
-        ),
-    )
-    ap.add_argument(
-        "--normalize-actions",
-        action="store_true",
-        dest="normalize_actions",
-        help="Use a mesma flag do treino (espaco de acao [-1, 1] escalado pelo ambiente).",
-    )
-
+    ap.add_argument('--seed', type=int, default=0, help='Seed do modelo treinado')
+    ap.add_argument('--run-tag', default='pilot')
+    ap.add_argument('--episodes', type=int, default=100)
+    ap.add_argument('--target-seed', type=int, default=10000, help='Mesma seed de alvos para todos os modelos')
+    ap.add_argument('--model-path', default=None)
+    ap.add_argument('--out', default=None, help='Caminho do CSV, sem sufixo automático')
+    ap.add_argument('--print-episodes', action='store_true')
     args = ap.parse_args()
+    if args.episodes <= 0:
+        ap.error('--episodes deve ser positivo')
+    tag = f'_{args.run_tag}' if args.run_tag else ''
+    model_path = Path(args.model_path) if args.model_path else Path('runs') / 'pure' / f'seed_{args.seed}{tag}' / 'ppo_model.zip'
+    config_path = model_path.with_name('config.json')
+    if not model_path.exists():
+        ap.error(f'Modelo não encontrado: {model_path}')
+    if not config_path.exists():
+        ap.error(f'Configuração do treino não encontrada: {config_path}. Informe o modelo dentro da pasta original.')
+    config = json.loads(config_path.read_text(encoding='utf8'))
+    cargs = config['args']
+    physics = config.get('physics', {})
+    env = TwoLinkArmEnv(lambda_action=float(cargs['lambda_action']),
+                          success_bonus=float(cargs['success_bonus']),
+                          max_delta_theta=float(cargs['max_delta_theta']),
+                          physics_hz=int(physics.get('physics_hz', 240)),
+                          decision_hz=int(physics.get('decision_hz', 30)),
+                          episode_seconds=float(physics.get('episode_seconds', 2.0)),
+                          force_limit=float(physics.get('force_limit', 20.0)),
+                          velocity_limit=float(physics.get('velocity_limit', 5.0)))
+    model = PPO.load(str(model_path), device='cpu')
+    if model.observation_space != env.observation_space or model.action_space != env.action_space:
+        env.close()
+        raise ValueError('Espaços de observação ou ação não correspondem ao ambiente atual')
+    rows = []
+    try:
+        for ep in range(args.episodes):
+            # Seed aplicada SOMENTE no primeiro reset: mesma sequência de alvos
+            # para agentes distintos com o mesmo --target-seed.
+            obs, reset_info = env.reset(seed=args.target_seed if ep == 0 else None)
+            target = np.array(reset_info['target_xy'], dtype=float)
+            initial_dist = float(reset_info['distance'])
+            initial_r = float(np.linalg.norm(target))
+            total_reward = 0.0
+            done = False
+            while not done:
+                action, _ = model.predict(obs, deterministic=True)
+                obs, reward, terminated, truncated, info = env.step(action)
+                total_reward += float(reward)
+                done = bool(terminated or truncated)
+            physical_steps = int(info['physics_steps'])
+            elapsed_s = float(info['elapsed_s'])
+            row = {
+                'mode': 'pure', 'seed': args.seed, 'target_seed': args.target_seed,
+                'episode': ep + 1, 'success': int(info['is_success']),
+                'terminated': int(terminated), 'truncated': int(truncated),
+                'final_distance': float(info['distance']),
+                'return': total_reward, 'length': int(info['decision_steps']),
+                'physics_steps': physical_steps, 'elapsed_s': elapsed_s,
+                'target_x': float(target[0]), 'target_y': float(target[1]),
+                'target_radius': initial_r, 'tip_init_dist': initial_dist,
+                'torque_abs_integral': float(info['torque_abs_integral']),
+                'torque_sq_integral': float(info['torque_sq_integral']),
+                'energy_abs': float(info['energy_abs']),
+                'peak_tau': float(np.max(np.abs(info['torque_peak']))),
+                'peak_omega': float(np.max(np.abs(info['velocity_peak']))),
+                'torque_envelope_rate': float(info['torque_envelope_rate']),
+                'velocity_envelope_rate': float(info['velocity_envelope_rate']),
+                'position_envelope_rate': float(info['position_envelope_rate']),
+                'tau_sat_rate': float(info['torque_saturation_rate']),
+                'safe_episode': int(info['safe_episode']),
+                'safe_success': int(info['safe_success']),
+                'action_clip_decisions': int(info['action_clip_decisions']),
+                'reference_clip_decisions': int(info['reference_clip_decisions']),
+                # Compatibilidade de nomes com CSVs antigos, mas a implementação atual integra cada
+                # passo físico. Estes aliases são derivados de valores físicos reais.
+                'energy': float(info['energy_abs']),
+                'mean_tau_sum': (float(info['torque_abs_integral']) / elapsed_s
+                                 if elapsed_s > 0 else float('nan')),
+                'tau_sum_total': (float(info['torque_abs_integral']) / env.dt
+                                  if env.dt > 0 else float('nan')),
+            }
+            rows.append(row)
+            if args.print_episodes:
+                print(f"ep={ep+1:03d} sucesso={row['success']} distância={row['final_distance']:.4f} "
+                      f"passos={row['length']:02d} seguro={row['safe_episode']}")
+    finally:
+        env.close()
+    out = Path(args.out) if args.out else Path('results') / f'eval_pure_seed{args.seed}{tag}.csv'
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with out.open('w', newline='', encoding='utf-8') as file:
+        writer = csv.DictWriter(file, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    numeric = ('success', 'final_distance', 'length', 'elapsed_s', 'torque_abs_integral',
+               'torque_sq_integral', 'energy_abs', 'peak_tau', 'peak_omega',
+               'torque_envelope_rate', 'velocity_envelope_rate', 'position_envelope_rate',
+               'tau_sat_rate', 'safe_episode', 'safe_success')
+    summary = {k: {'mean': float(np.mean([r[k] for r in rows])),
+                   'std_between_episodes': float(np.std([r[k] for r in rows], ddof=1)) if len(rows)>1 else 0.0}
+               for k in numeric}
+    summary['metadata'] = {'model_path': str(model_path), 'train_seed': args.seed,
+                           'target_seed': args.target_seed, 'episodes': args.episodes,
+                           'notes': 'Variabilidade entre episódios, não entre seeds de treinamento.'}
+    summ_path = out.with_name(out.stem + '_summary.json')
+    summ_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding='utf8')
+    print(f"\nSucesso: {summary['success']['mean']:.1%} | "
+          f"distância final média: {summary['final_distance']['mean']:.4f} m | "
+          f"sucesso seguro: {summary['safe_success']['mean']:.1%}")
+    print(f'CSV: {out}\nResumo: {summ_path}')
 
-    save_eval_command_log(args)
 
-    modes = ["pure", "pirl"] if args.mode == "both" else [args.mode]
-
-    # se target_seed nao for informado, usa a propria seed como padrao
-    target_seed_effective = args.target_seed if args.target_seed is not None else args.seed
-
-    all_rows = []
-    summaries = []
-    for m in modes:
-        summary, rows = evaluate(
-            m,
-            episodes=args.episodes,
-            render=args.render,
-            max_steps=args.max_steps,
-            print_episodes=args.print_episodes,
-            seed=args.seed,
-            run_tag=args.run_tag,
-            target_seed=target_seed_effective,
-            success_bonus=args.success_bonus,
-            max_delta_theta=args.max_delta_theta,
-            normalize_actions=args.normalize_actions,
-        )
-        summaries.append(summary)
-        all_rows.extend(rows)
-
-    print_summary_table(summaries)
-    csv_path, sum_path = save_csv(f"{args.out}_{args.seed}.csv", all_rows, summaries)
-    print(f"Arquivos salvos:- CSV por-episódio: {csv_path}- Resumo JSON: {sum_path}")
+if __name__ == '__main__':
+    main()

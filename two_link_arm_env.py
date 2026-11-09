@@ -1,4 +1,4 @@
-"""Braço planar de 2 DoF: Gymnasium + PyBullet.
+"""Braço planar de 2 DoF: Gymnasium + PyBullet, versão experimental atual.
 
 Design: PPO a 30 Hz, física a 240 Hz; incremento de referência persistente.
 Sem treino PIRL aqui: recompensas iguais para comparação inicial futura.
@@ -28,7 +28,7 @@ class TwoLinkArmEnv(gym.Env):
         super().__init__()
         if render_mode not in (None, "human", "rgb_array"):
             raise ValueError("render_mode inválido")
-        if decision_hz <= 0 or physics_hz <= 0 or physics_hz % decision_hz != 0:
+        if physics_hz % decision_hz != 0 or decision_hz <= 0:
             raise ValueError("physics_hz precisa ser múltiplo de decision_hz")
         if not (0 < target_r_min < target_r_max < 1.0):
             raise ValueError("alvo deve estar dentro do alcance geométrico (raio < 1m)")
