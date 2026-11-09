@@ -1,6 +1,14 @@
-"""Sanity checks independentes de PPO. Execute python test_env.py."""
+"""Sanity checks independentes de PPO.
+
+Execute da raiz: python scripts/tests/test_env.py.
+"""
 import math
+from pathlib import Path
+import sys
+
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from two_link_arm_env import TwoLinkArmEnv
 
 

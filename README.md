@@ -6,7 +6,7 @@ Este projeto contém a versão atualizada do ambiente PyBullet/Gymnasium. Os exp
 
 - `two_link_arm.urdf`: modelo físico com centros de massa e inércias corrigidos.
 - `two_link_arm_env.py`: ambiente Gymnasium, física a 240 Hz e decisões a 30 Hz.
-- `test_env.py`: testes de integridade e baseline de cinemática inversa.
+- `scripts/tests/test_env.py`: testes de integridade e baseline de cinemática inversa.
 - `train_rl.py`: piloto PPO puro com logs e modelos em `runs/`.
 - `eval_rl.py`: avaliação determinística, CSVs e resumos em `results/`.
 - `requirements.txt`: dependências principais.
@@ -18,7 +18,7 @@ Com o venv atual ativado:
 ```powershell
 python -m pip install -r requirements.txt
 python -m pip check
-python test_env.py
+python scripts/tests/test_env.py
 python -c "from stable_baselines3.common.env_checker import check_env; from two_link_arm_env import TwoLinkArmEnv; e=TwoLinkArmEnv(); check_env(e); e.close(); print('SB3 CHECK PASSOU')"
 python -m pip freeze > requirements-lock.txt
 ```
