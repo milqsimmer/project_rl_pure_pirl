@@ -1,285 +1,42 @@
-# Braço Robótico 2D com PyBullet, Gym e RL
+# Braço planar 2 DoF — experimento atual
 
-Este projeto simula um braço robótico com dois graus de liberdade (2-DOF) utilizando PyBullet e um ambiente Gym customizado. A cinemática inversa é resolvida analiticamente e o braço é usado em experimentos de Aprendizado por Reforço (PPO) com duas variantes de recompensa: um baseline de RL puro e uma versão Physics-Informed (PIRL) com penalização de torque/energia.
+Este projeto contém a versão atualizada do ambiente PyBullet/Gymnasium. Os experimentos legados estão preservados em outra branch e em outro venv.
 
-## 🔧 Estrutura do Robô
+## Arquivos
 
-O braço robótico é composto por:
-- Um link base fixo
-- Dois segmentos (`link1` e `link2`) conectados por juntas rotacionais
-- Um alvo (esfera vermelha) no espaço 3D
-- A ponta do `link2` é considerada o end-effector (atuador final)
+- `two_link_arm.urdf`: modelo físico com centros de massa e inércias corrigidos.
+- `two_link_arm_env.py`: ambiente Gymnasium, física a 240 Hz e decisões a 30 Hz.
+- `test_env.py`: testes de integridade e baseline de cinemática inversa.
+- `train_rl.py`: piloto PPO puro com logs e modelos em `runs/`.
+- `eval_rl.py`: avaliação determinística, CSVs e resumos em `results/`.
+- `requirements.txt`: dependências principais.
 
-## 📐 Cinemática Inversa Analítica
+## Preparação (PowerShell)
 
-Ao invés de usar o solver interno de IK do PyBullet, a solução dos ângulos é feita manualmente via trigonometria:
+Com o venv atual ativado:
 
-- Utiliza a posição do alvo no plano XY
-- Calcula os ângulos `θ1` e `θ2` que levam a ponta do braço até o alvo
-- Resolve com base nas fórmulas clássicas de cinemática de braços planarem 2-DOF
-
-## 🚀 O que já está implementado
-
-- Ambiente Gym customizado (`TwoLinkArmEnv`) com métricas ricas no `info` (distância, torque, energia, sucesso).
-- Resolução analítica de cinemática inversa para validação e geração de figuras.
-- Treino de políticas PPO em dois modos de recompensa (`pure` e `pirl`).
-- Avaliação sistemática dos modelos com métricas de sucesso, distância final, esforço em torque e energia.
-- Scripts de análise para escalas típicas (distância/ação/torque/energia) e inspeção detalhada de episódios.
-
-## 📂 Estrutura
-```
-├── two_link_arm_env.py       # Ambiente Gym customizado para o braço 2-DOF
-├── train_rl.py               # Script de treino PPO (modes: pure, pirl)
-├── eval_rl.py                # Script de avaliação dos modelos treinados
-├── watch_arm.py / watch_train.py  # Helpers interativos de visualização
-├── scripts/                  # (rodar sempre a partir da raiz do projeto)
-│   ├── analyze_scales.py     # Analisa escalas típicas de dist/ação/torque/energia
-│   ├── inspect_episodes.py   # Inspeção detalhada de episódios e CSVs representativos
-│   ├── runs/                 # Orquestração de treino/avaliação
-│   │   ├── run_experiments_seeds.py   # Pipeline legado de treino+avaliação para várias seeds
-│   │   ├── run_train_target_seeds.py  # Treino pure/pirl com seed = target_seed
-│   │   └── run_eval_target_seeds.py   # Eval usando pares (model_seed, target_seed)
-│   ├── graficos/             # Gráficos/tabelas (plot_train, plot_eval, ...)
-│   └── scripts_test/         # demo_inicial, test_env, test_tip_visual, sanity_check
-├── figs/                     # figs_env, figs_resultados, figs_treino, figs_episodios_inspecao
-├── tabelas/                  # Tabelas CSV agregadas
-├── docs/                     # Notas de experimentos, plano, requirements legado
-├── runs/                     # Saídas de treino PPO
-│   ├── runs_pure/            #   modo "pure"
-│   └── runs_pirl/            #   modo "pirl"
-├── results/                  # CSVs/JSONs de avaliação gerados por eval_rl.py
-├── two_link_arm.urdf         # Modelo URDF do braço
-├── requirements.txt          # Dependências do projeto
-├── AGENTS.md                 # Guia para agentes de código
-└── README.md                 # Este arquivo
+```powershell
+python -m pip install -r requirements.txt
+python -m pip check
+python test_env.py
+python -c "from stable_baselines3.common.env_checker import check_env; from two_link_arm_env import TwoLinkArmEnv; e=TwoLinkArmEnv(); check_env(e); e.close(); print('SB3 CHECK PASSOU')"
+python -m pip freeze > requirements-lock.txt
 ```
 
-## ▶️ Como rodar
+## Teste de integração (não é resultado científico)
 
-1. Crie um ambiente virtual (opcional, mas recomendado) e instale as dependências:
-   ```bash
-   python -m venv .venv
-   # Linux/macOS
-   source .venv/bin/activate
-   # Windows
-   .venv\Scripts\activate
-
-   pip install -r requirements.txt
-   ```
-
-2. Simulação / demonstração inicial (PyBullet puro, sem Gym/RL):
-   ```bash
-   python scripts/scripts_test/demo_inicial.py
-   ```
-
-3. Testes rápidos e debug do ambiente:
-   - Sanidade de Gym + NumPy:
-     ```bash
-     python scripts/scripts_test/sanity_check.py
-     ```
-   - Teste de IK + ambiente (vários alvos aleatórios):
-     ```bash
-     python scripts/scripts_test/test_env.py
-     ```
-   - Debug visual da ponta e do alvo (overlays na GUI do PyBullet):
-     ```bash
-     python scripts/scripts_test/test_tip_visual.py
-     ```
-
-## 🧠 Requisitos
-- Python 3.9+
-- Gym 0.21 (API legada: `reset() -> obs`, `step() -> (obs, reward, done, info)`)
-- PyBullet
-- NumPy
-- stable_baselines3 (PPO)
-
-
-## Treino e avaliação de RL
-
-### Treino (PPO)
-
-1. Modo "pure" (distância + penalidade leve de ação):
-   ```bash
-   python train_rl.py --mode pure --seed 0 --steps 2000000 --learning-rate 3e-4
-   ```
-
-2. Modo "pirl" (reward do pure + penalização de torque **por passo** `alpha_tau·(|τ₁|+|τ₂|)`, peso `--alpha-tau`; use `--alpha-tau-mode terminal` para a versão que penaliza o torque médio só no passo de sucesso):
-   ```bash
-   python train_rl.py --mode pirl --seed 0 --steps 2000000 --learning-rate 3e-4
-   ```
-
-3. Alinhando a sequência de alvos (pure vs pirl) com `target_seed`:
-   ```bash
-   python train_rl.py --mode pure --seed 0 --steps 2000000 --learning-rate 3e-4 --target-seed 0
-   python train_rl.py --mode pirl --seed 0 --steps 2000000 --learning-rate 3e-4 --target-seed 0
-   ```
-
-4. Exemplos de sweep de seeds (para experimentos mais completos):
-   ```bash
-   # pure
-   python train_rl.py --mode pure --seed 0 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pure --seed 1 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pure --seed 2 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pure --seed 3 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pure --seed 4 --steps 2000000 --learning-rate 3e-4
-
-   # pirl
-   python train_rl.py --mode pirl --seed 0 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pirl --seed 1 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pirl --seed 2 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pirl --seed 3 --steps 2000000 --learning-rate 3e-4
-   python train_rl.py --mode pirl --seed 4 --steps 2000000 --learning-rate 3e-4
-   ```
-
-> Configuração baseline recomendada (pure), usada nos experimentos atuais:
-> - `steps = 2_000_000`, `learning-rate = 3e-4`
-> - `lambda_a = 0.01`
-> - `success_bonus = 5.0`
-> - `max-delta-theta = 0.2` (maior intervalo de ação ajuda a convergir)
-> - `max-steps` no treino/avaliação = 200
-> - `target_seed` por padrão igual a `seed` (pure e pirl com a mesma
->   seed veem a mesma sequência de alvos)
->
-> Runs oficiais: pure com `--run-tag md02` e pirl com `--alpha-tau 2e-4 --run-tag md02_at2e4`,
-> seeds 0 a 10. O `plot_train.py` não tem tag padrão: passe `--pure-tag` e `--pirl-tag`. As runs
-> `md02_at2e4` foram treinadas com a penalização de torque por passo (hoje o padrão,
-> `--alpha-tau-mode per_step`); as runs `*_term` usaram a penalização terminal e, para
-> reproduzi-las, precisam de `--alpha-tau-mode terminal` (valor escolhido lá:
-> `alpha_tau = 0.3`, `md02_at03_term`).
-
-4. Saídas dos treinos:
-    - `runs/runs_pure/seed_<seed>[_<run-tag>]/monitor.csv` e `ppo_model_<seed>.zip`.
-    - `runs/runs_pirl/seed_<seed>[_<run-tag>]/monitor.csv` e `ppo_model_<seed>.zip`.
-    - `train_cmd.txt` com o comando e os argumentos de cada run.
-
-
-### Avaliação
-
-1. Avaliar um único modo:
-   ```bash
-   python eval_rl.py --mode pure --seed 0 --episodes 200 --max-steps 200
-   ```
-   ou
-   ```bash
-   python eval_rl.py --mode pirl --seed 0 --episodes 200 --max-steps 200
-   ```
-
-2. Comparar diretamente os dois modos:
-   ```bash
-   python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 --out results/eval_model0_target0_modeboth
-   ```
-
-3. Alinhar alvos de avaliação com o treino (`target_seed`):
-   ```bash
-   python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 --target-seed 0 \
-       --out results/eval_model0_target0_modeboth
-   ```
-
-4. Saídas das avaliações:
-    - `<out>_<seed>.csv` (métricas por episódio), `<out>_<seed>_summary.json` (resumo
-      agregado) e `<out>_<seed>_cmd.txt` (comando usado).
-    - Com `scripts/runs/run_eval_target_seeds.py` os arquivos saem como
-      `<out-dir>/eval_model<seed>_target<seed>_mode<pure|pirl>_<seed>.csv` (`--out-dir`,
-      default `results`); o `scripts/graficos/plot_eval.py` lê esse padrão de
-      `--results-dir` (default `results/md02`, onde estão as avaliações oficiais md02).
-
-
-## 🔁 Experimentos com várias seeds
-
-Para reproduzir um conjunto de experimentos de treino+avaliação para várias seeds:
-
-Opção legado (simples):
-
-```bash
-python scripts/runs/run_experiments_seeds.py --first-seed 0 --last-seed 4 \
-    --steps 300000 --episodes 200
+```powershell
+python train_rl.py --seed 0 --steps 4096 --run-tag smoke
+python eval_rl.py --seed 0 --run-tag smoke --episodes 10
 ```
 
-Opção recomendada (usando `target_seed` = `seed`):
+## Piloto RL puro
 
-```bash
-# Treino pure + pirl para seeds 0..4
-python scripts/runs/run_train_target_seeds.py --first-seed 0 --last-seed 4 --steps 2000000
-
-# Avaliação pure+pirl (usa os mesmos modelos e target_seeds)
-python scripts/runs/run_eval_target_seeds.py --mode both --model-first-seed 0 --model-last-seed 4
+```powershell
+python train_rl.py --seed 0 --steps 300000 --run-tag pilot
+python train_rl.py --seed 1 --steps 300000 --run-tag pilot
+python eval_rl.py --seed 0 --run-tag pilot --episodes 100 --target-seed 10000
+python eval_rl.py --seed 1 --run-tag pilot --episodes 100 --target-seed 10000
 ```
 
-
-## 📊 Análises adicionais
-
-- Escalas típicas de distância/ação/torque/energia:
-  ```bash
-  python scripts/analyze_scales.py --mode both --policy trained --seed 0 \
-      --episodes 50 --max-steps 200
-  ```
-
-- Inspeção detalhada de episódios representativos (baixa/alta energia,
-  sucesso/fracasso) e geração de CSVs passo a passo. Pure e pirl rodam os
-  **mesmos episódios** (mesmo `target_seed` = seed, logo o mesmo alvo), o que torna
-  as curvas comparáveis; os run-tags são obrigatórios:
-  ```bash
-  python scripts/inspect_episodes.py --first-seed 1 --last-seed 3 \
-      --pure-tag <tag_pure> --pirl-tag <tag_pirl> \
-      --episodes-per-config 20 --max-steps 200
-  python scripts/graficos/script_plot_inspected_episodes.py   # figuras pareadas -> figs/figs_episodios_inspecao/
-  ```
-
-- Figuras dos episódios inspecionados (lê `results/episodios_inspecao/`):
-  ```bash
-  python scripts/graficos/script_plot_inspected_episodes.py
-  ```
-
-- Geração de gráficos e tabelas agregadas (sucesso, distância, esforço, energia):
-  ```bash
-  python scripts/graficos/plot_train.py --seeds 1-10 --pure-tag <tag_pure> --pirl-tag <tag_pirl>   # -> figs/figs_treino/
-  python scripts/graficos/plot_eval.py --first-seed 1 --last-seed 10   # tabelas/ e figs/figs_resultados/md02/ (uma pasta por avaliação)
-  python scripts/graficos/plot_arm_from_env.py              # figura do braço -> figs/figs_env/
-  ```
-
-
-## 🔗 Exemplo de pipeline completo
-
-Exemplo mínimo (single-seed) do fluxo treino → avaliação → análises → gráficos:
-
-```bash
-# 1) Treino PPO para os dois modos (seed 0)
-python train_rl.py --mode pure --seed 0 --steps 2000000 --learning-rate 3e-4
-python train_rl.py --mode pirl --seed 0 --steps 2000000 --learning-rate 3e-4
-
-# 2) Avaliação conjunta (gera CSV/JSON em results/)
-python eval_rl.py --mode both --seed 0 --episodes 200 --max-steps 200 \
-    --out results/eval_model0_target0_modeboth
-
-# 3) Análises de escalas e episódios representativos
-python scripts/analyze_scales.py --mode both --policy trained --seed 0 \
-    --episodes 50 --max-steps 200
-python scripts/inspect_episodes.py --first-seed 0 --last-seed 0 \
-    --pure-tag "" --pirl-tag "" --episodes-per-config 20 --max-steps 200
-
-# 4) Geração de gráficos e tabelas agregadas
-python scripts/graficos/plot_train.py --seeds 0 --pure-tag "" --pirl-tag ""
-python scripts/graficos/plot_eval.py --first-seed 0 --last-seed 0
-```
-
-
-## Ajustes finos e dicas
-
-- Se o braço mal se mexer durante o treino:
-  - Primeiro tente aumentar `--max-delta-theta` em `train_rl.py` (por exemplo, de 0.1 para 0.15 ou 0.2).
-  - Ajustar `force` em `_apply_angles` dentro de `two_link_arm_env.py` é possível, mas prefira manter o valor
-    consistente com os experimentos de dissertação a menos que esteja apenas depurando o ambiente.
-
-- Se o movimento trepidar demais:
-  - Reduza `--max-delta-theta` (por exemplo, de 0.1 para 0.05).
-  - Aumente `max_episode_steps` no `TimeLimit` para 300 em `train_rl.py` (apenas para testes).
-
-- Para “apimentar” o modo PIRL:
-  - Use os parâmetros existentes (`--alpha-tau` para torque, `--success-bonus` para reforçar sucesso) e,
-    se for adicionar novos termos físicos, siga o plano descrito em `AGENTS.md`:
-    - manter o reward por passo idêntico ao do `pure`;
-    - aplicar termos físicos (torque médio, energia, postura, saturação)
-      apenas como penalidades terminais por episódio;
-    - ajustar `alpha_tau` de forma incremental, começando em valores
-      pequenos, sempre monitorando a taxa de sucesso versus economia de
-      esforço.
+Os scripts preservam os parâmetros físicos, registram configurações e não sobrescrevem silenciosamente modelos existentes. A avaliação usa alvos de teste comuns às políticas; seus CSVs não devem ser misturados aos do protocolo antigo.
