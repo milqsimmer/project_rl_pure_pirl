@@ -1,0 +1,15 @@
+command: C:\Users\milla\mestrado\env_projeto\Scripts\python.exe --mode pirl --seed 0 --episodes 200 --max-steps 200 --target-seed 0 --max-delta-theta 0.2 --success-bonus 5.0 --normalize-actions --run-tag md02_nrm_ps_a003 --out results/md02_alpha_seed0/eval_pirl_nrm_ps_a003
+args_json: {
+  "mode": "pirl",
+  "seed": 0,
+  "episodes": 200,
+  "render": false,
+  "max_steps": 200,
+  "out": "results/md02_alpha_seed0/eval_pirl_nrm_ps_a003",
+  "print_episodes": false,
+  "run_tag": "md02_nrm_ps_a003",
+  "target_seed": 0,
+  "success_bonus": 5.0,
+  "max_delta_theta": 0.2,
+  "normalize_actions": true
+}
