@@ -34,7 +34,9 @@ METRICS = [
     ("tau", "Torque (> p% de 20 N·m)"),
     ("theta", "Ângulo articular (> p% de 3,14 rad)"),
 ]
-COLS = ["success"] + [f"{m}_gt{p}" for m, _ in METRICS for p in PCTS]
+COLS = ["success", "length", "tau_sum_total"] + [
+    f"{m}_gt{p}" for m, _ in METRICS for p in PCTS
+]
 
 
 def seed_from_name(path: str) -> int:
@@ -45,8 +47,11 @@ def seed_from_name(path: str) -> int:
 
 
 def load_group(label: str, pattern: str) -> pd.DataFrame:
-    """Média por seed das colunas de interesse (uma linha por seed)."""
-    files = sorted(glob.glob(pattern))
+    """Média por seed das colunas de interesse (uma linha por seed).
+
+    `pattern` pode ter vários padrões separados por ';' (arquivos em pastas diferentes).
+    """
+    files = sorted({f for pat in pattern.split(";") for f in glob.glob(pat.strip())})
     if not files:
         raise SystemExit(f"Nenhum arquivo para o grupo '{label}': {pattern}")
     rows = []
@@ -126,7 +131,7 @@ def main() -> None:
     print(f"[sensibilidade] Tabela salva em: {tpath}")
 
     # resumo legível no terminal
-    show = ["group", "n_seeds", "success_mean"] + [
+    show = ["group", "n_seeds", "success_mean", "length_mean", "tau_sum_total_mean"] + [
         f"{m}_gt{p}_mean" for m in ("omega", "tau", "theta") for p in (80,)
     ]
     print(table[show].to_string(index=False, float_format=lambda x: f"{x:.3f}"))
