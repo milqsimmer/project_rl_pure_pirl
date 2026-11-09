@@ -1,8 +1,16 @@
-"""Sanity checks independentes de PPO. Execute python test_env_v2.py."""
+"""Sanity checks independentes de PPO.
+
+Execute da raiz: python scripts/tests/test_env.py.
+"""
 
 import math
+from pathlib import Path
+import sys
+
 import numpy as np
-from two_link_arm_env_v2 import TwoLinkArmEnvV2
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from two_link_arm_env import TwoLinkArmEnv
 
 
 def ik(x, y):
@@ -14,7 +22,7 @@ def ik(x, y):
 
 
 def main():
-    env = TwoLinkArmEnvV2()
+    env = TwoLinkArmEnv()
     try:
         obs, info = env.reset(seed=123)
         assert obs.shape == (8,) and obs.dtype == np.float32

@@ -1,12 +1,13 @@
 """Diagnostico do controlador POSITION_CONTROL do braco 2-DoF no PyBullet.
 
 Executa degrau, rampa e reversao, para cada junta isoladamente, sem PPO.
-Mantem force=20 e os ganhos padrao do POSITION_CONTROL, como no experimento original.
+Mantem force=20 e os ganhos padrao do POSITION_CONTROL.
+Compara omissao de maxVelocity (controle original) com maxVelocity=5 rad/s.
 Salva amostras por passo fisico, resumo e graficos.
 
 Uso:
-    python test_controller.py --urdf two_link_arm_v2.urdf
-    python test_controller.py --urdf two_link_arm_v2.urdf --out-dir resultados_controle
+    python scripts/tests/test_controller_velocity.py --urdf two_link_arm.urdf
+    python scripts/tests/test_controller_velocity.py --urdf two_link_arm.urdf --out-dir resultados_controle_velocidade
 """
 
 import argparse
@@ -40,20 +41,21 @@ def reference(kind, t):
     raise ValueError(f"Perfil desconhecido: {kind}")
 
 
-def reset_and_hold(robot, client):
+def reset_and_hold(robot, client, max_velocity):
     for joint in JOINTS:
         p.resetJointState(robot, joint, targetValue=0.0,
                           targetVelocity=0.0, physicsClientId=client)
         p.setJointMotorControl2(robot, joint, p.POSITION_CONTROL,
                                 targetPosition=0.0, force=FORCE,
+                                **({"maxVelocity": max_velocity} if max_velocity is not None else {}),
                                 physicsClientId=client)
     # Elimina efeitos transitorios de reset antes da coleta.
     for _ in range(24):
         p.stepSimulation(physicsClientId=client)
 
 
-def simulate(robot, client, joint, kind):
-    reset_and_hold(robot, client)
+def simulate(robot, client, joint, kind, max_velocity, mode):
+    reset_and_hold(robot, client, max_velocity)
     samples = []
     for k in range(STEPS):
         t = k * DT
@@ -62,10 +64,12 @@ def simulate(robot, client, joint, kind):
         for j in JOINTS:
             p.setJointMotorControl2(robot, j, p.POSITION_CONTROL,
                                     targetPosition=target if j == joint else 0.0,
-                                    force=FORCE, physicsClientId=client)
+                                    force=FORCE,
+                                    **({"maxVelocity": max_velocity} if max_velocity is not None else {}),
+                                    physicsClientId=client)
         p.stepSimulation(physicsClientId=client)
         state = p.getJointStates(robot, list(JOINTS), physicsClientId=client)
-        row = {"profile": kind, "tested_joint": joint + 1,
+        row = {"mode": mode, "profile": kind, "tested_joint": joint + 1,
                "step": k, "time_s": (k + 1) * DT, "target_rad": target}
         for j in JOINTS:
             row[f"q{j+1}_rad"] = float(state[j][0])
@@ -82,7 +86,7 @@ def summarize(rows):
     q = np.array([r[f"q{joint}_rad"] for r in rows])
     target = np.array([r["target_rad"] for r in rows])
     return {
-        "profile": rows[0]["profile"], "tested_joint": joint,
+        "mode": rows[0]["mode"], "profile": rows[0]["profile"], "tested_joint": joint,
         "peak_speed_rad_s": float(np.max(np.abs(omega))),
         "peak_torque_Nm": float(np.max(np.abs(tau))),
         "speed_gt4_pct": float(100 * np.mean(np.abs(omega) > SPEED_ENVELOPE)),
@@ -130,7 +134,7 @@ def plot_profile(rows, out_path):
     ax[2].legend()
     for a in ax:
         a.grid(alpha=0.3)
-    fig.suptitle(f"Teste {name} - junta {joint}")
+    fig.suptitle(f"{rows[0]['mode']} - teste {name} - junta {joint}")
     fig.tight_layout()
     fig.savefig(out_path, dpi=140)
     plt.close(fig)
@@ -138,8 +142,8 @@ def plot_profile(rows, out_path):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--urdf", type=Path, default=Path("two_link_arm_v2.urdf"))
-    parser.add_argument("--out-dir", type=Path, default=Path("resultados_controle"))
+    parser.add_argument("--urdf", type=Path, default=Path(__file__).resolve().parents[2] / "two_link_arm.urdf")
+    parser.add_argument("--out-dir", type=Path, default=Path("resultados_controle_velocidade"))
     args = parser.parse_args()
 
     urdf = args.urdf.resolve()
@@ -157,28 +161,28 @@ def main():
         assert p.getNumJoints(robot, physicsClientId=client) == 2, "Esperadas duas juntas"
 
         all_rows, summaries = [], []
-        for kind in ("degrau", "rampa", "reversao"):
-            for joint in JOINTS:
-                rows = simulate(robot, client, joint, kind)
-                all_rows.extend(rows)
-                summaries.append(summarize(rows))
-                plot_profile(rows, args.out_dir / f"{kind}_junta{joint+1}.png")
+        # Baseline omite maxVelocity exatamente como no script anterior.
+        for mode, vmax in (("original", None), ("limitado_5", 5.0)):
+            for kind in ("degrau", "rampa", "reversao"):
+                for joint in JOINTS:
+                    rows = simulate(robot, client, joint, kind, vmax, mode)
+                    all_rows.extend(rows)
+                    summaries.append(summarize(rows))
+                    plot_profile(rows, args.out_dir / f"{mode}_{kind}_junta{joint+1}.png")
         save_csv(args.out_dir / "amostras.csv", all_rows)
         save_csv(args.out_dir / "resumo.csv", summaries)
 
-        print("\nRESULTADOS (cada perfil dura 1,5 s simulados):")
-        print("Perfil     Junta | Pico vel. | Pico torque | >4 rad/s | >5 rad/s | >16 N.m | ~20 N.m | Erro final")
+        print("\nCOMPARACAO DO CONTROLADOR (1,5 s por perfil):")
+        print("Modo           Perfil    Junta | Pico vel. | Pico torque | >5 rad/s | ~20 N.m | Erro final")
         for s in summaries:
-            print(f"{s['profile']:<10} {s['tested_joint']:>2}   |"
+            print(f"{s['mode']:<15}{s['profile']:<11}{s['tested_joint']:>2}   |"
                   f" {s['peak_speed_rad_s']:>7.2f}   |"
                   f" {s['peak_torque_Nm']:>8.2f}    |"
-                  f" {s['speed_gt4_pct']:>6.1f}%  |"
                   f" {s['speed_gt5_pct']:>6.1f}%  |"
-                  f" {s['torque_gt16_pct']:>6.1f}% |"
                   f" {s['torque_near20_pct']:>6.1f}% |"
                   f" {s['final_tracking_error_rad']:.4f} rad")
-        print(f"\nDados e 6 graficos salvos em: {args.out_dir.resolve()}")
-        print("Nota: 5 rad/s e uma referencia do URDF, nao uma garantia de limitacao no controlador.")
+        print(f"\nArquivos salvos em: {args.out_dir.resolve()}")
+        print("Nota: maxVelocity limita a referencia do motor, nao necessariamente a velocidade fisica absoluta.")
     finally:
         p.disconnect(physicsClientId=client)
 

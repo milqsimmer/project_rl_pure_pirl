@@ -1,12 +1,12 @@
-"""Valida propriedades inerciais e cinemática de two_link_arm_v2.urdf.
-Execute: python validate_urdf_v2.py
+"""Valida propriedades inerciais e cinemática de two_link_arm.urdf.
+Execute da raiz: python scripts/tests/validate_urdf.py
 Requer: pybullet
 """
 from pathlib import Path
 import math
 import pybullet as p
 
-urdf = str(Path(__file__).with_name('two_link_arm_v2.urdf'))
+urdf = str(Path(__file__).resolve().parents[2] / 'two_link_arm.urdf')
 client = p.connect(p.DIRECT)
 try:
     p.setGravity(0, 0, -9.81, physicsClientId=client)

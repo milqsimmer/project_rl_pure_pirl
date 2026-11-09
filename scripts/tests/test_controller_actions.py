@@ -1,7 +1,7 @@
 """Teste do controlador sob sequencias de acoes tipicas de PPO (sem RL).
 
 Requisitos: numpy, pybullet, matplotlib (graficos opcionais).
-Uso: python test_controller_actions.py --urdf two_link_arm_v2.urdf
+Uso: python scripts/tests/test_controller_actions.py --urdf two_link_arm.urdf
 
 Compara frequencias de decisao 30 Hz e 60 Hz; fisica sempre 240 Hz.
 O incremento angular e aplicado a uma referencia persistente, NAO a posicao medida.
@@ -140,7 +140,7 @@ def make_plot(rows, out_path):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--urdf', default='two_link_arm_v2.urdf')
+    parser.add_argument('--urdf', default=str(Path(__file__).resolve().parents[2] / 'two_link_arm.urdf'))
     parser.add_argument('--out-dir', default='resultados_controle_acoes')
     parser.add_argument('--seed', type=int, default=42)
     args = parser.parse_args()
